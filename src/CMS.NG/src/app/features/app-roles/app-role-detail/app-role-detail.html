@@ -1,0 +1,72 @@
+@if (loading()) {
+  <div class="state">載入中…</div>
+} @else if (notFound()) {
+  <div class="state">
+    <p>找不到這個角色。</p>
+    <p-button label="回到清單" icon="pi pi-arrow-left" routerLink="/app-roles" />
+  </div>
+} @else if (role(); as item) {
+  <div class="page-header">
+    <div class="titles">
+      <h1>檢視角色</h1>
+      <span class="subtitle">{{ item.roleId }}</span>
+    </div>
+
+    <div class="actions">
+      <p-button
+        label="回到清單"
+        icon="pi pi-arrow-left"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/app-roles" />
+      <p-button
+        label="編輯"
+        icon="pi pi-pencil"
+        [routerLink]="['/app-roles', item.roleId, 'edit']" />
+      <p-button
+        label="刪除"
+        icon="pi pi-trash"
+        severity="danger"
+        [outlined]="true"
+        (onClick)="confirmDelete()" />
+    </div>
+  </div>
+
+  <section class="card">
+    <h2>角色資料</h2>
+
+    <dl class="detail-grid">
+      <dt>主代碼</dt>
+      <dd>{{ item.pkid }}</dd>
+
+      <dt>角色代碼</dt>
+      <dd class="strong">{{ item.roleId }}</dd>
+
+      <dt>角色名稱</dt>
+      <dd>{{ item.roleName }}</dd>
+
+      <dt>權限等級</dt>
+      <dd>{{ item.permissionLevel }}</dd>
+
+      <dt>描述</dt>
+      <dd>{{ item.description || '—' }}</dd>
+
+      <dt>使用者數</dt>
+      <dd>{{ item.userCount }}</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <h2>使用者</h2>
+
+    @if (userLabels().length) {
+      <div class="chips">
+        @for (label of userLabels(); track label) {
+          <p-chip [label]="label" icon="pi pi-user" />
+        }
+      </div>
+    } @else {
+      <p class="muted">尚未指派使用者。</p>
+    }
+  </section>
+}

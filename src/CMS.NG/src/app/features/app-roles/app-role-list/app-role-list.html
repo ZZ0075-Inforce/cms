@@ -1,0 +1,133 @@
+<div class="page-header">
+  <div class="titles">
+    <h1>角色 AppRole</h1>
+    <span class="subtitle">使用者角色</span>
+  </div>
+
+  <div class="actions">
+    <p-button
+      label="搜尋條件"
+      icon="pi pi-filter"
+      severity="secondary"
+      [outlined]="true"
+      [badge]="hasActiveFilters ? '!' : undefined"
+      (onClick)="filterDrawerVisible.set(true)" />
+
+    <p-button
+      label="新增"
+      icon="pi pi-plus"
+      severity="success"
+      routerLink="/app-roles/new" />
+  </div>
+</div>
+
+<div class="table-card">
+  <p-table
+    [value]="roles()"
+    [loading]="loading()"
+    dataKey="roleId"
+    [paginator]="true"
+    [rows]="page.rows"
+    [first]="page.first"
+    [rowsPerPageOptions]="[10, 20, 50]"
+    [sortField]="sort.sortField"
+    [sortOrder]="sort.sortOrder"
+    (onSort)="onSort($event)"
+    (onPage)="onPage($event)"
+    paginatorPosition="top"
+    currentPageReportTemplate="{first}–{last} 筆，共 {totalRecords} 筆"
+    [showCurrentPageReport]="true"
+    styleClass="p-datatable-sm p-datatable-gridlines">
+
+    <ng-template #header>
+      <tr>
+        <th pSortableColumn="pkid" style="width: 6rem">主代碼 <p-sortIcon field="pkid" /></th>
+        <th pSortableColumn="roleId">角色代碼 <p-sortIcon field="roleId" /></th>
+        <th pSortableColumn="roleName">角色名稱 <p-sortIcon field="roleName" /></th>
+        <th pSortableColumn="permissionLevel" style="width: 9rem">權限等級 <p-sortIcon field="permissionLevel" /></th>
+        <th pSortableColumn="description">描述 <p-sortIcon field="description" /></th>
+        <th pSortableColumn="userCount" style="width: 8rem">使用者數 <p-sortIcon field="userCount" /></th>
+        <th style="width: 10rem">操作</th>
+      </tr>
+    </ng-template>
+
+    <ng-template #body let-role>
+      <tr>
+        <td>{{ role.pkid }}</td>
+        <td class="cell-strong">{{ role.roleId }}</td>
+        <td>{{ role.roleName }}</td>
+        <td class="cell-number">{{ role.permissionLevel }}</td>
+        <td>{{ role.description }}</td>
+        <td class="cell-number">{{ role.userCount }}</td>
+        <td>
+          <div class="row-actions">
+            <p-button
+              icon="pi pi-eye"
+              severity="secondary"
+              [text]="true"
+              [rounded]="true"
+              pTooltip="檢視"
+              [attr.aria-label]="'檢視 ' + role.roleId"
+              (onClick)="view(role)" />
+            <p-button
+              icon="pi pi-pencil"
+              severity="info"
+              [text]="true"
+              [rounded]="true"
+              pTooltip="編輯"
+              [attr.aria-label]="'編輯 ' + role.roleId"
+              (onClick)="edit(role)" />
+            <p-button
+              icon="pi pi-trash"
+              severity="danger"
+              [text]="true"
+              [rounded]="true"
+              pTooltip="刪除"
+              [attr.aria-label]="'刪除 ' + role.roleId"
+              (onClick)="confirmDelete(role)" />
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="7" class="empty">查無資料</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-drawer
+  [(visible)]="filterDrawerVisible"
+  header="搜尋條件"
+  position="right"
+  styleClass="filter-drawer">
+
+  <div class="filter-field">
+    <label for="filter-keyword">關鍵字</label>
+    <input
+      pInputText
+      id="filter-keyword"
+      type="text"
+      placeholder="角色代碼／角色名稱／描述"
+      [(ngModel)]="draftFilters.keyword"
+      (keyup.enter)="applyFilters()" />
+  </div>
+
+  <div class="filter-field">
+    <label for="filter-permission-level">權限等級</label>
+    <p-inputnumber
+      inputId="filter-permission-level"
+      [(ngModel)]="draftFilters.permissionLevel"
+      [min]="0"
+      [max]="9999"
+      [useGrouping]="false"
+      placeholder="不限" />
+  </div>
+
+  <div class="filter-actions">
+    <p-button label="清除" icon="pi pi-times" severity="secondary" [outlined]="true" (onClick)="clearFilters()" />
+    <p-button label="搜尋" icon="pi pi-search" (onClick)="applyFilters()" />
+  </div>
+</p-drawer>

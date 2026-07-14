@@ -1,0 +1,46 @@
+<div class="app-shell" [class.collapsed]="collapsed()">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-name">UWA</span>
+      <button
+        type="button"
+        class="collapse-btn"
+        (click)="toggleSidebar()"
+        [attr.aria-label]="collapsed() ? '展開選單' : '收合選單'">
+        <i class="pi" [class.pi-angle-left]="!collapsed()" [class.pi-angle-right]="collapsed()"></i>
+      </button>
+    </div>
+
+    <nav class="nav">
+      @for (group of navGroups(); track group.label) {
+        <div class="nav-group">
+          <button type="button" class="nav-group-header" (click)="toggleGroup(group)">
+            <i [class]="group.icon"></i>
+            <span class="nav-label">{{ group.label }}</span>
+            <i class="pi chevron" [class.pi-angle-down]="group.expanded" [class.pi-angle-right]="!group.expanded"></i>
+          </button>
+
+          @if (group.expanded) {
+            <ul class="nav-items">
+              @for (item of group.items; track item.route) {
+                <li>
+                  <a [routerLink]="item.route" routerLinkActive="active" class="nav-item">
+                    <i [class]="item.icon"></i>
+                    <span class="nav-label">{{ item.label }}</span>
+                  </a>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      }
+    </nav>
+  </aside>
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>
+
+<p-toast position="top-right" />
+<p-confirmDialog />

@@ -1,0 +1,75 @@
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.9rem 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+
+  h1 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #1e293b;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+
+  h2 {
+    margin: 0 0 1rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #334155;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1.1rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #334155;
+  }
+
+  input,
+  ::ng-deep .p-inputnumber,
+  ::ng-deep .p-inputnumber input,
+  ::ng-deep .p-multiselect {
+    width: 100%;
+  }
+}
+
+.hint {
+  color: #94a3b8;
+  font-size: 0.78rem;
+}
+
+/* Let the selected-user chips wrap instead of overflowing on one line. */
+::ng-deep .user-multiselect .p-multiselect-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  white-space: normal;
+}

@@ -1,0 +1,103 @@
+<form [formGroup]="form" (ngSubmit)="save()">
+  <div class="page-header">
+    <h1>{{ isEdit() ? '編輯角色' : '新增角色' }}</h1>
+
+    <div class="actions">
+      <p-button
+        label="取消"
+        icon="pi pi-times"
+        severity="secondary"
+        [outlined]="true"
+        type="button"
+        (onClick)="cancel()" />
+      <p-button
+        label="儲存"
+        icon="pi pi-check"
+        severity="success"
+        type="submit"
+        [loading]="saving()"
+        [disabled]="loading()" />
+    </div>
+  </div>
+
+  @if (!loading()) {
+    <section class="card">
+      <h2>角色資料</h2>
+
+      <div class="field">
+        <label for="roleId">角色代碼 <span class="required-mark">*</span></label>
+        <input
+          pInputText
+          id="roleId"
+          type="text"
+          formControlName="roleId"
+          placeholder="請輸入角色代碼"
+          maxlength="200" />
+        @if (isEdit()) {
+          <small class="hint">角色代碼為主鍵，建立後不可修改。</small>
+        }
+        @if (invalid('roleId')) {
+          <div class="field-error">
+            @if (form.controls.roleId.hasError('required')) {
+              角色代碼為必填。
+            } @else if (form.controls.roleId.hasError('pattern')) {
+              角色代碼僅能包含英數字、底線與減號。
+            } @else {
+              角色代碼長度不可超過 200 字。
+            }
+          </div>
+        }
+      </div>
+
+      <div class="field">
+        <label for="roleName">角色名稱 <span class="required-mark">*</span></label>
+        <input pInputText id="roleName" type="text" formControlName="roleName" maxlength="200" />
+        @if (invalid('roleName')) {
+          <div class="field-error">角色名稱為必填，且長度不可超過 200 字。</div>
+        }
+      </div>
+
+      <div class="field">
+        <label for="permissionLevel">權限等級 <span class="required-mark">*</span></label>
+        <p-inputnumber
+          inputId="permissionLevel"
+          formControlName="permissionLevel"
+          [min]="0"
+          [max]="9999"
+          [useGrouping]="false" />
+        @if (invalid('permissionLevel')) {
+          <div class="field-error">權限等級須介於 0 到 9999。</div>
+        }
+      </div>
+
+      <div class="field">
+        <label for="description">描述</label>
+        <input pInputText id="description" type="text" formControlName="description" maxlength="400" />
+        @if (invalid('description')) {
+          <div class="field-error">描述長度不可超過 400 字。</div>
+        }
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>使用者</h2>
+
+      <div class="field">
+        <p-multiselect
+          inputId="userIds"
+          formControlName="userIds"
+          [options]="userOptions()"
+          optionLabel="label"
+          optionValue="userId"
+          placeholder="選擇使用者（可複選）"
+          appendTo="body"
+          [filter]="true"
+          [showToggleAll]="true"
+          [maxSelectedLabels]="9999"
+          display="chip"
+          styleClass="user-multiselect" />
+        <small class="hint">指定哪些使用者屬於這個角色。</small>
+      </div>
+    </section>
+  }
+</form>

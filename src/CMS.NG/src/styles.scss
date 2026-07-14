@@ -1,0 +1,39 @@
+@use 'primeicons/primeicons.css';
+
+/* PrimeNG 20 uses the styled-theme engine (preset configured in app.config.ts).
+   There is no primeng/resources/** theme CSS to import — only the icon font above. */
+
+:root {
+  --app-sidebar-bg: #16233a;
+  --app-sidebar-bg-hover: #1f3050;
+  --app-sidebar-fg: #cbd5e1;
+  --app-sidebar-fg-active: #ffffff;
+  --app-sidebar-active: #2563eb;
+  --app-content-bg: #f6f8fb;
+  --app-sidebar-width: 260px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--app-content-bg);
+  font-family: 'Segoe UI', 'Microsoft JhengHei', 'PingFang TC', system-ui, sans-serif;
+  color: #1f2937;
+}
+
+/* Required-field marker used by the form pages. */
+.required-mark {
+  color: #dc2626;
+  margin-inline-start: 0.15rem;
+}
+
+.field-error {
+  color: #dc2626;
+  font-size: 0.78rem;
+  margin-top: 0.25rem;
+}
