@@ -76,11 +76,29 @@ describe('CourseForm', () => {
     scheduleOn: new Date(2026, 0, 14)   // 14 Jan 2026
   };
 
+  /** The toolbar must stay pinned above the (potentially long) scrolling form body. */
+  function expectStickyToolbar(): void {
+    const header: HTMLElement | null = fixture.nativeElement.querySelector('.page-header');
+    expect(header).withContext('page-header toolbar should be rendered').not.toBeNull();
+
+    const style = getComputedStyle(header!);
+    expect(style.position).toBe('sticky');
+    expect(style.top).toBe('0px');
+
+    const text = header!.textContent ?? '';
+    expect(text).toContain('取消');
+    expect(text).toContain('儲存');
+  }
+
   describe('new mode', () => {
     beforeEach(async () => await setup(null));
 
     it('does not fetch a course', () => {
       expect(service.getById).not.toHaveBeenCalled();
+    });
+
+    it('pins the action toolbar to the top with Save/Cancel present', () => {
+      expectStickyToolbar();
     });
 
     it('is invalid until every required field is supplied', () => {
@@ -134,6 +152,10 @@ describe('CourseForm', () => {
       expect(form().controls.title.value).toBe('Azure 基礎');
       expect(form().controls.certificationPkids.value).toEqual([5]);
       expect(form().controls.jobCategoryPkids.value).toEqual([7]);
+    });
+
+    it('pins the action toolbar to the top with Save/Cancel present', () => {
+      expectStickyToolbar();
     });
 
     it('keeps the loaded 下架日期 rather than the +10 年 auto value', () => {

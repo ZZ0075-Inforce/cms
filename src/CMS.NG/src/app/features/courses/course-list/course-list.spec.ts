@@ -91,6 +91,23 @@ describe('CourseList', () => {
   beforeEach(() => sessionStorage.clear());
   afterEach(() => sessionStorage.clear());
 
+  it('pins the page header (title + 搜尋條件/新增) to the top while the table scrolls', async () => {
+    await setup();
+
+    const header: HTMLElement | null = fixture.nativeElement.querySelector('.page-header');
+    expect(header).withContext('page-header should be rendered').not.toBeNull();
+
+    const style = getComputedStyle(header!);
+    expect(style.position).toBe('sticky');
+    expect(style.top).toBe('0px');
+
+    const text = header!.textContent ?? '';
+    expect(text).toContain('課程 Course');
+    expect(text).toContain('訓練課程主資料');
+    expect(text).toContain('搜尋條件');
+    expect(text).toContain('新增');
+  });
+
   it('loads courses on init and renders the JOIN labels', async () => {
     await setup();
 
