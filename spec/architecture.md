@@ -54,10 +54,23 @@ app/core/services/  {T}Service + LookupService — the only HttpClient callers
                     (AppRole, AppUser, Partner, CourseGroup, Course)
 app/core/utils/     date.util.ts — toIso / fromIso / addYears (local components, not UTC)
 app/features/{app-roles,app-users,partners,course-groups,courses}/   {*-list, *-detail, *-form}/
+app/features/featured-promo-items/   custom scheduling board, not list/detail/form — see below
+app/shared/         reusable presentational components (e.g. QrCode)
 ```
 
-Path aliases in `tsconfig.json`: `@env`, `@core/*`, `@features/*`. The `@env` import resolves per
-build via `fileReplacements` in `angular.json` — that is what makes "no dev proxy" work.
+Path aliases in `tsconfig.json`: `@env`, `@core/*`, `@features/*`, `@shared/*`. The `@env` import
+resolves per build via `fileReplacements` in `angular.json` — that is what makes "no dev proxy" work.
+
+## Beyond the standard CRUD slice
+
+- **FeaturedPromoItem** — a custom scheduling board under 首頁 Home (TrainingCenter tabs +
+  Monday–Sunday week + Slot grid + inline Edit/New/Paste), not the standard list/detail/form. Spec:
+  `spec/custom/FeaturedPromoItem/`.
+- **Course detail QR code** — `@shared/qr-code`, backed by the `qrcode` npm dep (whitelisted in
+  `angular.json` → `allowedCommonJsDependencies`); encodes
+  `https://www.uuu.com.tw/Course/Show/{pkid}/{CourseId}`.
+- **Course list inline editing** — double-click a cell to edit, blur to persist via `PUT /api/courses`;
+  fetches the full record (`getById`) first so the N-N sets are not wiped.
 
 ## Intentional deviations from `code-gen.convention.md`
 

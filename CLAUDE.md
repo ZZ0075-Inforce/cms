@@ -11,26 +11,15 @@ Full-stack CMS over an existing, already-populated SQL Server database. Two apps
 Request flow is `Controller → I{T}Repository → Dapper → SQL Server`: no service layer, no EF — the
 repository owns its SQL. Angular's `app.ts` *is* the shell (no separate layout component); feature
 components are standalone and lazy-routed. Live tables: AppRole, AppUser, Partner, CourseGroup, Course,
-FeaturedPromoItem (a **custom** scheduling board under 首頁 Home — TrainingCenter tabs + Monday–Sunday
-week + Slot grid + inline Edit/New/Paste — not the standard list/detail/form).
-
-## Beyond the standard CRUD slice
-
-- **FeaturedPromoItem** — a custom scheduling board under 首頁 Home (not list/detail/form). Spec:
-  `spec/custom/FeaturedPromoItem/`.
-- **Course detail QR code** — `@shared/qr-code`, backed by the `qrcode` npm dep (whitelisted in
-  `angular.json` → `allowedCommonJsDependencies`); encodes
-  `https://www.uuu.com.tw/Course/Show/{pkid}/{CourseId}`.
-- **Course list inline editing** — double-click a cell to edit, blur to persist via `PUT /api/courses`;
-  fetches the full record (`getById`) first so the N-N sets are not wiped.
-- **`@shared/*`** path alias — reusable presentational components (e.g. `QrCode`).
+FeaturedPromoItem (a **custom** scheduling board under 首頁 Home, not the standard list/detail/form —
+see `spec/architecture.md` § Beyond the standard CRUD slice).
 
 ## Golden rules (apply on every task)
 
 - **Never run `database/*.sql`.** It is reference DDL only; the `CMS` database already exists and is
   populated, and the scripts re-declare overlapping tables across files and will fail.
 - **`pkid` is not always the primary key.** The auth tables (AppRole/AppUser/AppUserRole) key on an
-  `nvarchar` string, not `pkid`; most other tables do use `pkid`. Read the DDL per table.
+  `nvarchar` string, not `pkid`; most other tables do use `pkid`. Read the DDL per table — `spec/gotchas.md`.
 - **The toolchain is pinned; bare scaffolding produces the wrong versions.** Don't delete `global.json`,
   don't `ng new` / `ng generate` with the global CLI, don't bump PrimeNG/theme packages. See
   `spec/toolchain.md` first.
@@ -56,7 +45,7 @@ npx ng build                                  # proves the prod environment.ts r
 | When you are… | Read |
 |---|---|
 | Adding a table (file layout, routes, PrimeNG patterns) | `spec/code-gen.convention.md` — the authority |
-| Navigating the codebase / picking a slice to copy | `spec/architecture.md` |
+| Navigating the codebase, picking a slice to copy, or the QR/inline-edit/shared extras | `spec/architecture.md` |
 | Writing repository, controller, or Angular code | `spec/gotchas.md` — load-bearing guards |
 | Writing or running tests | `spec/testing.md` |
 | Scaffolding, installing deps, or upgrading | `spec/toolchain.md` |
