@@ -135,6 +135,67 @@ public class AuthRepositoryIntegrationTests(DatabaseFixture fixture) : IAsyncLif
         Assert.Null(await _repository.AuthenticateAsync("", ""));
     }
 
+    // ---------- VerifyPasswordAsync ----------
+
+    [IntegrationFact]
+    public async Task VerifyPasswordAsync_True_ForCorrectPassword()
+    {
+        var userId = await SeedUserAsync();
+
+        Assert.True(await _repository.VerifyPasswordAsync(userId, ValidPassword));
+    }
+
+    [IntegrationFact]
+    public async Task VerifyPasswordAsync_False_ForWrongPasswordOrUnknownUser()
+    {
+        var userId = await SeedUserAsync();
+
+        Assert.False(await _repository.VerifyPasswordAsync(userId, "not-the-password"));
+        Assert.False(await _repository.VerifyPasswordAsync("TEST_no_such_user", ValidPassword));
+        Assert.False(await _repository.VerifyPasswordAsync(userId, ""));
+    }
+
+    // ---------- UpdatePasswordAsync ----------
+
+    [IntegrationFact]
+    public async Task UpdatePasswordAsync_SetsHashToSha256OfNew_AndBumpsUpdatedTime()
+    {
+        var userId = await SeedUserAsync();
+        var (_, originalTime) = await ReadPasswordAsync(userId);
+        const string newPassword = "Brand#New9";
+
+        var ok = await _repository.UpdatePasswordAsync(userId, newPassword);
+
+        Assert.True(ok);
+        var (storedHash, updatedTime) = await ReadPasswordAsync(userId);
+
+        // PasswordHash is exactly SHA-256(new).
+        Assert.Equal(PasswordHasher.Hash(newPassword), storedHash);
+        // The new password now verifies and the old one no longer does.
+        Assert.True(await _repository.VerifyPasswordAsync(userId, newPassword));
+        Assert.False(await _repository.VerifyPasswordAsync(userId, ValidPassword));
+        // PasswordUpdatedTime was stamped to (roughly) now, at or after the seed time.
+        Assert.NotNull(updatedTime);
+        Assert.True(updatedTime >= originalTime);
+        Assert.True(Math.Abs((DateTime.Now - updatedTime!.Value).TotalMinutes) < 5);
+    }
+
+    [IntegrationFact]
+    public async Task UpdatePasswordAsync_False_ForUnknownUser()
+    {
+        Assert.False(await _repository.UpdatePasswordAsync("TEST_no_such_user", "Brand#New9"));
+    }
+
+    /// <summary>Reads the raw PasswordHash / PasswordUpdatedTime for a test-owned user.</summary>
+    private async Task<(string? Hash, DateTime? UpdatedTime)> ReadPasswordAsync(string userId)
+    {
+        await using var conn = await fixture.OpenAsync();
+        var row = await conn.QuerySingleAsync<(string? Hash, DateTime? UpdatedTime)>(
+            "SELECT PasswordHash AS Hash, PasswordUpdatedTime AS UpdatedTime FROM dbo.AppUser WHERE UserId = @UserId;",
+            new { UserId = userId });
+        return row;
+    }
+
     // ---------- GetSigningKeyAsync ----------
 
     [IntegrationFact]

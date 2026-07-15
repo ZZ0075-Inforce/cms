@@ -31,3 +31,13 @@ export interface ProfileResponse {
   userId: string;
   userName: string;
 }
+
+/**
+ * Body of POST /api/Auth/change-password. All three are raw passwords — the server verifies the current
+ * one against the stored hash and never accepts or returns a hash. The target UserId comes from the JWT.
+ */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}

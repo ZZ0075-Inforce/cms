@@ -5,7 +5,7 @@
   </div>
 </div>
 
-<form [formGroup]="form" (ngSubmit)="submit()">
+<form class="profile-form" [formGroup]="form" (ngSubmit)="submit()">
   <section class="card">
     <h2>基本資料</h2>
 
@@ -49,5 +49,63 @@
       icon="pi pi-check"
       type="submit"
       [loading]="submitting()" />
+  </div>
+</form>
+
+<form class="password-form" [formGroup]="passwordForm" (ngSubmit)="submitPassword()">
+  <section class="card">
+    <h2>變更密碼</h2>
+
+    <div class="field">
+      <label for="currentPassword">目前密碼</label>
+      <input
+        pInputText
+        id="currentPassword"
+        type="password"
+        formControlName="currentPassword"
+        autocomplete="current-password" />
+      @if (passwordRequired('currentPassword')) {
+        <div class="field-error">請輸入目前密碼。</div>
+      }
+    </div>
+
+    <div class="field">
+      <label for="newPassword">新密碼</label>
+      <input
+        pInputText
+        id="newPassword"
+        type="password"
+        formControlName="newPassword"
+        autocomplete="new-password" />
+      @if (passwordRequired('newPassword')) {
+        <div class="field-error">請輸入新密碼。</div>
+      } @else if (showComplexityError()) {
+        <div class="field-error complexity">{{ complexityMessage }}</div>
+      }
+      <p class="hint">{{ complexityMessage }}</p>
+    </div>
+
+    <div class="field">
+      <label for="confirmPassword">確認新密碼</label>
+      <input
+        pInputText
+        id="confirmPassword"
+        type="password"
+        formControlName="confirmPassword"
+        autocomplete="new-password" />
+      @if (passwordRequired('confirmPassword')) {
+        <div class="field-error">請再次輸入新密碼。</div>
+      } @else if (showMismatchError()) {
+        <div class="field-error">新密碼與確認密碼不一致。</div>
+      }
+    </div>
+  </section>
+
+  <div class="actions">
+    <p-button
+      label="變更密碼"
+      icon="pi pi-key"
+      type="submit"
+      [loading]="changingPassword()" />
   </div>
 </form>

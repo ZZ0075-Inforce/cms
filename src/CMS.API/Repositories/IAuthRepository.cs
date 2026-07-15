@@ -24,4 +24,18 @@ public interface IAuthRepository
     /// false when no row matches (e.g. the account was deleted after the token was issued).
     /// </summary>
     Task<bool> UpdateUserNameAsync(string userId, string userName, CancellationToken ct = default);
+
+    /// <summary>
+    /// True when <paramref name="password"/> hashes to the stored <c>PasswordHash</c> for
+    /// <paramref name="userId"/>. The hash is compared inside the SQL and never leaves the repository;
+    /// blank input fails closed.
+    /// </summary>
+    Task<bool> VerifyPasswordAsync(string userId, string password, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sets <c>PasswordHash = SHA256(newPassword)</c> and stamps <c>PasswordUpdatedTime = now</c> for
+    /// <paramref name="userId"/>. Returns false when no row matches. The caller is responsible for having
+    /// verified the current password and enforced complexity first.
+    /// </summary>
+    Task<bool> UpdatePasswordAsync(string userId, string newPassword, CancellationToken ct = default);
 }
