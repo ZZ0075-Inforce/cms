@@ -1,0 +1,47 @@
+<form class="promo-form" [formGroup]="form" (ngSubmit)="onSave()">
+  <div class="field">
+    <label [for]="'promoCode'">PromoCode：</label>
+    <div class="promo-code-row">
+      <input
+        pInputText
+        id="promoCode"
+        formControlName="promoCode"
+        class="promo-code-input"
+        autocomplete="off"
+        (blur)="lookup()" />
+      <p-button
+        type="button"
+        label="查詢"
+        severity="secondary"
+        size="small"
+        [loading]="lookingUp()"
+        (onClick)="lookup()" />
+    </div>
+    @if (lookupError()) {
+      <small class="error">{{ lookupError() }}</small>
+    } @else if (invalid('promoCode')) {
+      <small class="error">促銷代碼為必填</small>
+    }
+  </div>
+
+  <div class="field">
+    <label [for]="'topic'">Topic：</label>
+    <input pInputText id="topic" formControlName="topic" class="wide" autocomplete="off" />
+    @if (invalid('topic')) {
+      <small class="error">標題為必填</small>
+    }
+  </div>
+
+  <div class="field">
+    <label [for]="'description'">Description：</label>
+    <input pInputText id="description" formControlName="description" class="wide" autocomplete="off" />
+    @if (invalid('description')) {
+      <small class="error">說明為必填</small>
+    }
+  </div>
+
+  <div class="actions">
+    <p-button type="submit" label="Save" [text]="true" size="small" />
+    <p-button type="button" label="Cancel" [text]="true" severity="secondary" size="small" (onClick)="onCancel()" />
+  </div>
+</form>

@@ -1,0 +1,72 @@
+<section class="board">
+  <!-- TrainingCenter tabs: label = Name, value = pkid; click filters TrainingCenter_pkid -->
+  <div class="tabs" role="tablist">
+    @for (center of trainingCenters(); track center.pkid) {
+      <button
+        type="button"
+        role="tab"
+        class="tab"
+        [class.active]="activeCenterPkid() === center.pkid"
+        [attr.aria-selected]="activeCenterPkid() === center.pkid"
+        (click)="selectCenter(center.pkid)">
+        {{ center.name }}
+      </button>
+    }
+  </div>
+
+  <!-- One-week (Monday–Sunday) ScheduleOn navigator -->
+  <div class="week-nav">
+    <button type="button" class="week-arrow" aria-label="上一週" (click)="prevWeek()">&lt;&lt;--</button>
+    <span class="week-label">{{ weekLabel() }}</span>
+    <button type="button" class="week-arrow" aria-label="下一週" (click)="nextWeek()">--&gt;&gt;</button>
+  </div>
+
+  @if (trainingCenters().length === 0) {
+    <p class="empty">尚無訓練中心資料。</p>
+  }
+
+  @for (day of weekDays(); track day.iso) {
+    <div class="day">
+      <div class="day-header">{{ day.header }}</div>
+
+      @for (slot of slots; track slot) {
+        <div class="slot-row" [class.editing]="isEditing(day.iso, slot)">
+          @if (isEditing(day.iso, slot)) {
+            <span class="slot-no">{{ slot }}</span>
+            <div class="editor">
+              <app-featured-promo-item-form
+                [context]="editingContext()!"
+                [initial]="editingInitial()"
+                (save)="onSave($event)"
+                (cancel)="closeEditor()" />
+            </div>
+          } @else {
+            @let item = itemAt(day.iso, slot);
+            <span class="slot-no">{{ slot }}</span>
+
+            @if (item) {
+              <span class="row-actions">
+                <button type="button" class="linkish" pTooltip="下移版位" (click)="move(item, 'down')">+</button>
+                <button type="button" class="linkish" pTooltip="上移版位" (click)="move(item, 'up')">--</button>
+                <button type="button" class="link" (click)="edit(day, slot, item)">Edit</button>
+                <button type="button" class="link" (click)="copy(item)">Copy</button>
+                <button type="button" class="link danger" (click)="confirmDelete(item)">Delete</button>
+              </span>
+              <span class="col promo-code">{{ item.promoCode }}</span>
+              <span class="col topic">{{ item.topic }}</span>
+              <span class="col description">{{ item.description }}</span>
+            } @else {
+              <span class="row-actions">
+                <button type="button" class="link" (click)="create(day, slot)">Edit</button>
+                <button type="button" class="link" [disabled]="!copied()" (click)="paste(day, slot)">Paste</button>
+              </span>
+              <span class="col promo-code empty-col"></span>
+              <span class="col topic empty-col"></span>
+              <span class="col description empty-col"></span>
+            }
+          }
+        </div>
+      }
+    </div>
+  }
+</section>

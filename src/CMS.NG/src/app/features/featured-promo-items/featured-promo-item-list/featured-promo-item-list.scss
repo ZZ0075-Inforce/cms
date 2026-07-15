@@ -1,0 +1,141 @@
+.board {
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 2px solid #c8c8c8;
+  padding-bottom: 0;
+
+  .tab {
+    border: 1px solid #c8c8c8;
+    border-bottom: none;
+    background: #f3f3f3;
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    border-radius: 4px 4px 0 0;
+
+    &.active {
+      background: #fff;
+      font-weight: 700;
+      text-decoration: underline;
+      position: relative;
+      top: 1px;
+    }
+  }
+}
+
+.week-nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.5rem 0;
+
+  .week-label {
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .week-arrow {
+    background: none;
+    border: 1px solid #c8c8c8;
+    border-radius: 4px;
+    padding: 0.2rem 0.6rem;
+    cursor: pointer;
+    font-family: monospace;
+  }
+}
+
+.empty {
+  color: #777;
+  padding: 1rem;
+}
+
+.day {
+  .day-header {
+    background: #e9e9e9;
+    border: 1px solid #d0d0d0;
+    font-weight: 700;
+    padding: 0.35rem 0.75rem;
+    margin-top: 0.5rem;
+  }
+}
+
+.slot-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid #f0f0f0;
+
+  &.editing {
+    align-items: flex-start;
+  }
+
+  .slot-no {
+    width: 1.2rem;
+    text-align: right;
+    color: #333;
+  }
+
+  .row-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 14rem;
+  }
+
+  .editor {
+    flex: 1;
+  }
+
+  .col {
+    border: 1px solid #cfcfcf;
+    padding: 0.25rem 0.5rem;
+    background: #fff;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    &.promo-code { flex: 0 0 18rem; }
+    &.topic { flex: 0 0 18rem; }
+    &.description { flex: 1; }
+
+    &.empty-col { min-height: 1.4rem; }
+  }
+}
+
+.link,
+.linkish {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.link {
+  color: #7a4a12;
+  text-decoration: underline;
+
+  &.danger { color: #b00020; }
+
+  &:disabled {
+    color: #bbb;
+    cursor: not-allowed;
+    text-decoration: none;
+  }
+}
+
+.linkish {
+  color: #333;
+  font-weight: 700;
+  width: 1.1rem;
+}

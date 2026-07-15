@@ -1,0 +1,45 @@
+.promo-form {
+  border: 2px solid #222;
+  background: #fff;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    label {
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+  }
+
+  .promo-code-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+
+    .promo-code-input {
+      flex: 0 0 22rem;
+      max-width: 100%;
+    }
+  }
+
+  .wide {
+    width: 100%;
+  }
+
+  .actions {
+    display: flex;
+    gap: 2rem;
+    padding-left: 6rem;
+  }
+
+  .error {
+    color: #b00020;
+    font-size: 0.8rem;
+  }
+}
