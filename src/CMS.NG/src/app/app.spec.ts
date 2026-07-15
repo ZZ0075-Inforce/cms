@@ -83,6 +83,17 @@ describe('App shell', () => {
     expect(text).toContain('登出');
   });
 
+  it('shows a link to 我的個人資料 (the profile page) in the user menu', () => {
+    seedSession(['Admin'], '王小明');
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const link: HTMLAnchorElement | null =
+      fixture.nativeElement.querySelector('a.user[href="/profile"]');
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toContain('王小明');
+  });
+
   it('renders no sidebar when there is no session', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();

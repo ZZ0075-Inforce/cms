@@ -3,7 +3,13 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable } from 'rxjs';
 import { environment } from '@env';
-import { AuthProfile, LoginRequest, LoginResponse } from '@core/models/auth.model';
+import {
+  AuthProfile,
+  LoginRequest,
+  LoginResponse,
+  ProfileResponse,
+  UpdateProfileRequest
+} from '@core/models/auth.model';
 import { decodeExp, decodeRoles } from '@core/utils/jwt.util';
 
 /** sessionStorage key for the signed-in profile (session, not local: cleared when the tab closes). */
@@ -30,9 +36,24 @@ export class AuthService {
     return this.http.post<LoginResponse>(`${this.base}/login`, request);
   }
 
+  /** Updates the signed-in user's own UserName (the server takes the UserId from the token). */
+  updateProfile(request: UpdateProfileRequest): Observable<ProfileResponse> {
+    return this.http.put<ProfileResponse>(`${this.base}/profile`, request);
+  }
+
   setSession(profile: AuthProfile): void {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
     this.profileSig.set(profile);
+  }
+
+  /**
+   * Refreshes just the displayed UserName after a profile update, keeping the same token and userId,
+   * so the shell and sessionStorage reflect the new name without a re-login. No-op when signed out.
+   */
+  setUserName(userName: string): void {
+    const current = this.profileSig();
+    if (!current) return;
+    this.setSession({ ...current, userName });
   }
 
   clearSession(): void {

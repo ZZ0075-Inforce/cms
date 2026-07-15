@@ -1,0 +1,53 @@
+<div class="page-header">
+  <div class="titles">
+    <h1>我的個人資料</h1>
+    <span class="subtitle">{{ userId() }}</span>
+  </div>
+</div>
+
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <section class="card">
+    <h2>基本資料</h2>
+
+    <div class="field">
+      <label for="userId">使用者代碼</label>
+      <input pInputText id="userId" type="text" [value]="userId()" readonly disabled />
+    </div>
+
+    <div class="field">
+      <label for="userName">使用者名稱</label>
+      <input
+        pInputText
+        id="userName"
+        type="text"
+        formControlName="userName"
+        autocomplete="name"
+        placeholder="請輸入使用者名稱" />
+      @if (invalid()) {
+        <div class="field-error">請輸入使用者名稱。</div>
+      }
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>角色</h2>
+
+    @if (roles().length) {
+      <div class="chips">
+        @for (role of roles(); track role) {
+          <p-chip [label]="role" icon="pi pi-id-card" />
+        }
+      </div>
+    } @else {
+      <p class="muted">尚未指派角色。</p>
+    }
+  </section>
+
+  <div class="actions">
+    <p-button
+      label="儲存"
+      icon="pi pi-check"
+      type="submit"
+      [loading]="submitting()" />
+  </div>
+</form>

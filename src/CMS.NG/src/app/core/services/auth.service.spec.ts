@@ -67,6 +67,35 @@ describe('AuthService', () => {
     expect(service.roles()).toEqual([]);
   });
 
+  it('updateProfile PUTs only the UserName to /Auth/profile', () => {
+    service.updateProfile({ userName: '新名字' }).subscribe();
+
+    const req = httpMock.expectOne(`${environment.apiBaseUrl}/Auth/profile`);
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ userName: '新名字' });
+    req.flush({ userId: 'admin', userName: '新名字' });
+  });
+
+  it('setUserName refreshes the name in the signal and session, keeping userId and token', () => {
+    const token = makeToken({ role: ['Admin'] });
+    service.setSession({ userId: 'admin', userName: '舊名字', accessToken: token });
+
+    service.setUserName('新名字');
+
+    expect(service.userName()).toBe('新名字');
+    const stored = JSON.parse(sessionStorage.getItem('cms-auth')!);
+    expect(stored.userName).toBe('新名字');
+    expect(stored.userId).toBe('admin');
+    expect(stored.accessToken).toBe(token);
+  });
+
+  it('setUserName is a no-op when signed out', () => {
+    service.setUserName('新名字');
+
+    expect(service.userName()).toBe('');
+    expect(sessionStorage.getItem('cms-auth')).toBeNull();
+  });
+
   it('treats an expired token as signed-out', () => {
     const past = Math.floor(Date.now() / 1000) - 60;
     service.setSession({ userId: 'a', userName: 'a', accessToken: makeToken({ role: ['Admin'], exp: past }) });

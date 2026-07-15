@@ -17,6 +17,13 @@ export const routes: Routes = [
     children: [
       { path: '', redirectTo: 'app-roles', pathMatch: 'full' },
 
+      // The signed-in user's own profile — reachable from the shell's user menu, not the sidebar nav.
+      {
+        path: 'profile',
+        loadComponent: () => import('@features/profile/profile/profile').then(m => m.Profile),
+        title: '我的個人資料'
+      },
+
       {
         path: 'app-roles',
         loadComponent: () =>

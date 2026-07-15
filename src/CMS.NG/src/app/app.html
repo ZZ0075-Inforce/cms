@@ -38,10 +38,14 @@
       </nav>
 
       <div class="sidebar-footer">
-        <div class="user" [title]="auth.userName()">
+        <a
+          routerLink="/profile"
+          routerLinkActive="active"
+          class="user"
+          [title]="auth.userName() + '（我的個人資料）'">
           <i class="pi pi-user"></i>
           <span class="nav-label user-name">{{ auth.userName() }}</span>
-        </div>
+        </a>
         <button type="button" class="logout-btn" (click)="logout()">
           <i class="pi pi-sign-out"></i>
           <span class="nav-label">登出</span>
