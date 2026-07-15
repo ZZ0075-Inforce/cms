@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 import { environment } from '@env';
 import {
   AuthProfile,
+  ChangePasswordRequest,
   LoginRequest,
   LoginResponse,
   ProfileResponse,
@@ -39,6 +40,11 @@ export class AuthService {
   /** Updates the signed-in user's own UserName (the server takes the UserId from the token). */
   updateProfile(request: UpdateProfileRequest): Observable<ProfileResponse> {
     return this.http.put<ProfileResponse>(`${this.base}/profile`, request);
+  }
+
+  /** Changes the signed-in user's own password (the server takes the UserId from the token). */
+  changePassword(request: ChangePasswordRequest): Observable<void> {
+    return this.http.post<void>(`${this.base}/change-password`, request);
   }
 
   setSession(profile: AuthProfile): void {

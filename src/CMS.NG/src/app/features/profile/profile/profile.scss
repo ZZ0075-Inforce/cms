@@ -67,6 +67,18 @@
   .field-error {
     color: #dc2626;
     font-size: 0.8rem;
+
+    // The complexity message is bilingual and carries a newline — keep the line break.
+    &.complexity {
+      white-space: pre-line;
+    }
+  }
+
+  .hint {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 0.78rem;
+    white-space: pre-line;
   }
 }
 

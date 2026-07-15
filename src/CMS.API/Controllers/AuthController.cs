@@ -85,10 +85,57 @@ public class AuthController(IAuthRepository repository) : ControllerBase
         return Ok(new ProfileResponse { UserId = userId, UserName = userName });
     }
 
+    /// <summary>
+    /// Changes the signed-in user's password. The UserId is taken from the JWT, never the body. In order:
+    /// the current password must match the stored hash (else nothing changes), the new password must meet
+    /// the complexity policy, and the confirmation must equal the new password. On success the stored hash
+    /// and PasswordUpdatedTime are replaced. No password hash ever crosses the API boundary.
+    /// </summary>
+    [Authorize]
+    [HttpPost("change-password")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ChangePassword(
+        [FromBody] ChangePasswordRequest request, CancellationToken ct)
+    {
+        var userId = User.FindFirstValue(JwtTokenGenerator.UserIdClaim);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        // 1. The current password must be correct — verified against the stored hash. If it is wrong,
+        //    return before anything is touched.
+        if (!await repository.VerifyPasswordAsync(userId, request.CurrentPassword ?? string.Empty, ct))
+            return BadRequest(BadRequestProblem("變更密碼失敗", "目前密碼不正確。"));
+
+        // 2. The new password must satisfy the complexity policy.
+        if (!PasswordPolicy.IsComplexEnough(request.NewPassword))
+            return BadRequest(BadRequestProblem("變更密碼失敗", PasswordPolicy.ViolationMessage));
+
+        // 3. New password and confirmation must match (ordinal — every character counts).
+        if (!string.Equals(request.NewPassword, request.ConfirmPassword, StringComparison.Ordinal))
+            return BadRequest(BadRequestProblem("變更密碼失敗", "新密碼與確認密碼不一致。"));
+
+        // 4. Persist the new hash and stamp the update time.
+        var updated = await repository.UpdatePasswordAsync(userId, request.NewPassword, ct);
+        if (!updated)
+            return NotFound();
+
+        return NoContent();
+    }
+
     private static ProblemDetails InvalidCredentials() => new()
     {
         Status = StatusCodes.Status401Unauthorized,
         Title = "登入失敗",
         Detail = "使用者代碼或密碼錯誤。"
+    };
+
+    private static ProblemDetails BadRequestProblem(string title, string detail) => new()
+    {
+        Status = StatusCodes.Status400BadRequest,
+        Title = title,
+        Detail = detail
     };
 }

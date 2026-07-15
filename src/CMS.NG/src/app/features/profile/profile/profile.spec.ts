@@ -30,7 +30,29 @@ function setUserName(fixture: { nativeElement: HTMLElement }, value: string): vo
 }
 
 function submit(fixture: { nativeElement: HTMLElement }): void {
-  (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
+  (fixture.nativeElement.querySelector('form.profile-form') as HTMLFormElement)
+    .dispatchEvent(new Event('submit'));
+}
+
+function setValue(fixture: { nativeElement: HTMLElement }, selector: string, value: string): void {
+  const input = fixture.nativeElement.querySelector(selector) as HTMLInputElement;
+  input.value = value;
+  input.dispatchEvent(new Event('input'));
+}
+
+function submitPassword(fixture: { nativeElement: HTMLElement }): void {
+  (fixture.nativeElement.querySelector('form.password-form') as HTMLFormElement)
+    .dispatchEvent(new Event('submit'));
+}
+
+/** Fills the change-password form with the given values (defaults are a valid, matching, strong pair). */
+function fillPasswordForm(
+  fixture: { nativeElement: HTMLElement },
+  { current = 'OldPass#1', next = 'NewPass#2', confirm = 'NewPass#2' } = {}
+): void {
+  setValue(fixture, '#currentPassword', current);
+  setValue(fixture, '#newPassword', next);
+  setValue(fixture, '#confirmPassword', confirm);
 }
 
 describe('Profile page', () => {
@@ -105,5 +127,65 @@ describe('Profile page', () => {
     submit(fixture);
 
     httpMock.expectNone(`${environment.apiBaseUrl}/Auth/profile`);
+  });
+
+  describe('change password (client validation)', () => {
+    const url = `${environment.apiBaseUrl}/Auth/change-password`;
+
+    it('POSTs the three passwords when the form is valid', () => {
+      const fixture = TestBed.createComponent(Profile);
+      fixture.detectChanges();
+
+      fillPasswordForm(fixture);
+      submitPassword(fixture);
+
+      const req = httpMock.expectOne(url);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({
+        currentPassword: 'OldPass#1',
+        newPassword: 'NewPass#2',
+        confirmPassword: 'NewPass#2'
+      });
+      req.flush(null);
+    });
+
+    it('does not POST when the new password fails the complexity policy, and shows the message', () => {
+      const fixture = TestBed.createComponent(Profile);
+      fixture.detectChanges();
+
+      // 'weak' is < 8 chars and < 3 classes.
+      fillPasswordForm(fixture, { next: 'weak', confirm: 'weak' });
+      submitPassword(fixture);
+      fixture.detectChanges();
+
+      httpMock.expectNone(url);
+      // The inline complexity error (distinct from the always-on hint) is shown.
+      const error = fixture.nativeElement.querySelector('.field-error.complexity');
+      expect(error).not.toBeNull();
+      expect(error!.textContent).toContain('密碼長度至少需 8 碼');
+    });
+
+    it('does not POST when the new and confirm passwords do not match', () => {
+      const fixture = TestBed.createComponent(Profile);
+      fixture.detectChanges();
+
+      fillPasswordForm(fixture, { next: 'NewPass#2', confirm: 'NewPass#3' });
+      submitPassword(fixture);
+      fixture.detectChanges();
+
+      httpMock.expectNone(url);
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('新密碼與確認密碼不一致');
+    });
+
+    it('does not POST when the current password is empty', () => {
+      const fixture = TestBed.createComponent(Profile);
+      fixture.detectChanges();
+
+      fillPasswordForm(fixture, { current: '' });
+      submitPassword(fixture);
+
+      httpMock.expectNone(url);
+    });
   });
 });

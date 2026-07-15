@@ -91,4 +91,44 @@ public sealed class AuthRepository(IDbConnectionFactory connectionFactory) : IAu
 
         return affected > 0;
     }
+
+    public async Task<bool> VerifyPasswordAsync(
+        string userId, string password, CancellationToken ct = default)
+    {
+        // Fail closed before touching the DB (and before hashing a null password).
+        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrEmpty(password))
+            return false;
+
+        // PasswordHash is compared here and never SELECTed — it must not leave the repository.
+        const string sql = """
+            SELECT CASE WHEN EXISTS (
+                SELECT 1 FROM dbo.AppUser
+                WHERE UserId = @UserId AND PasswordHash = @PasswordHash
+            ) THEN 1 ELSE 0 END;
+            """;
+
+        await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
+        return await conn.ExecuteScalarAsync<bool>(new CommandDefinition(
+            sql,
+            new { UserId = userId, PasswordHash = PasswordHasher.Hash(password) },
+            cancellationToken: ct));
+    }
+
+    public async Task<bool> UpdatePasswordAsync(
+        string userId, string newPassword, CancellationToken ct = default)
+    {
+        const string sql = """
+            UPDATE dbo.AppUser
+            SET    PasswordHash = @PasswordHash, PasswordUpdatedTime = @Now
+            WHERE  UserId = @UserId;
+            """;
+
+        await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
+        var affected = await conn.ExecuteAsync(new CommandDefinition(
+            sql,
+            new { UserId = userId, PasswordHash = PasswordHasher.Hash(newPassword), Now = DateTime.Now },
+            cancellationToken: ct));
+
+        return affected > 0;
+    }
 }
