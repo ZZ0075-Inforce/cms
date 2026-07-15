@@ -9,6 +9,7 @@ DapperConfig.Register();
 const string CorsPolicy = "LocalhostCors";
 
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
+builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IAppRoleRepository, AppRoleRepository>();
 builder.Services.AddScoped<IAppUserRepository, AppUserRepository>();
 builder.Services.AddScoped<IPartnerRepository, PartnerRepository>();
