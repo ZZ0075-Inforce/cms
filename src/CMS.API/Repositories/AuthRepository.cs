@@ -73,4 +73,22 @@ public sealed class AuthRepository(IDbConnectionFactory connectionFactory) : IAu
 
         return key;
     }
+
+    public async Task<bool> UpdateUserNameAsync(
+        string userId, string userName, CancellationToken ct = default)
+    {
+        // UserId is the immutable key — only UserName is in the SET list. PasswordHash / roles are
+        // never touched here. The caller passes the userId from the JWT, so a user renames only itself.
+        const string sql = """
+            UPDATE dbo.AppUser
+            SET    UserName = @UserName
+            WHERE  UserId = @UserId;
+            """;
+
+        await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
+        var affected = await conn.ExecuteAsync(new CommandDefinition(
+            sql, new { UserId = userId, UserName = userName }, cancellationToken: ct));
+
+        return affected > 0;
+    }
 }

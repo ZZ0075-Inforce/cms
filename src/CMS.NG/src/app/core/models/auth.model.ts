@@ -20,3 +20,14 @@ export interface AuthProfile {
   userName: string;
   accessToken: string;
 }
+
+/** Body of PUT /api/Auth/profile — only UserName is sent; the target UserId comes from the JWT. */
+export interface UpdateProfileRequest {
+  userName: string;
+}
+
+/** The response from PUT /api/Auth/profile: the authenticated user's id and newly-saved UserName. */
+export interface ProfileResponse {
+  userId: string;
+  userName: string;
+}

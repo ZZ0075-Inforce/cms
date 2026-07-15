@@ -128,6 +128,20 @@
     color: #fff;
     font-size: 0.9rem;
     min-width: 0;
+    text-decoration: none;
+    padding: 0.35rem 0.5rem;
+    margin: 0 -0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--app-sidebar-bg-hover);
+    }
+
+    &.active {
+      background: var(--app-sidebar-active);
+      color: var(--app-sidebar-fg-active);
+    }
   }
 
   .user-name {

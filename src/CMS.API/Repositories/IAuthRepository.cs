@@ -17,4 +17,11 @@ public interface IAuthRepository
     /// 'appConfig' JSON). Throws if the config or property is missing — a server-configuration fault.
     /// </summary>
     Task<string> GetSigningKeyAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Updates only <c>AppUser.UserName</c> for the given <paramref name="userId"/> (the authenticated
+    /// user). The UserId key is never in the SET list; PasswordHash and roles are untouched. Returns
+    /// false when no row matches (e.g. the account was deleted after the token was issued).
+    /// </summary>
+    Task<bool> UpdateUserNameAsync(string userId, string userName, CancellationToken ct = default);
 }
