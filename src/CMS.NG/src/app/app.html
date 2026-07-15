@@ -1,46 +1,61 @@
-<div class="app-shell" [class.collapsed]="collapsed()">
-  <aside class="sidebar">
-    <div class="brand">
-      <span class="brand-name">UWA</span>
-      <button
-        type="button"
-        class="collapse-btn"
-        (click)="toggleSidebar()"
-        [attr.aria-label]="collapsed() ? '展開選單' : '收合選單'">
-        <i class="pi" [class.pi-angle-left]="!collapsed()" [class.pi-angle-right]="collapsed()"></i>
-      </button>
-    </div>
+@if (auth.isAuthenticated()) {
+  <div class="app-shell" [class.collapsed]="collapsed()">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-name">UWA</span>
+        <button
+          type="button"
+          class="collapse-btn"
+          (click)="toggleSidebar()"
+          [attr.aria-label]="collapsed() ? '展開選單' : '收合選單'">
+          <i class="pi" [class.pi-angle-left]="!collapsed()" [class.pi-angle-right]="collapsed()"></i>
+        </button>
+      </div>
 
-    <nav class="nav">
-      @for (group of navGroups(); track group.label) {
-        <div class="nav-group">
-          <button type="button" class="nav-group-header" (click)="toggleGroup(group)">
-            <i [class]="group.icon"></i>
-            <span class="nav-label">{{ group.label }}</span>
-            <i class="pi chevron" [class.pi-angle-down]="group.expanded" [class.pi-angle-right]="!group.expanded"></i>
-          </button>
+      <nav class="nav">
+        @for (group of visibleNavGroups(); track group.label) {
+          <div class="nav-group">
+            <button type="button" class="nav-group-header" (click)="toggleGroup(group)">
+              <i [class]="group.icon"></i>
+              <span class="nav-label">{{ group.label }}</span>
+              <i class="pi chevron" [class.pi-angle-down]="group.expanded" [class.pi-angle-right]="!group.expanded"></i>
+            </button>
 
-          @if (group.expanded) {
-            <ul class="nav-items">
-              @for (item of group.items; track item.route) {
-                <li>
-                  <a [routerLink]="item.route" routerLinkActive="active" class="nav-item">
-                    <i [class]="item.icon"></i>
-                    <span class="nav-label">{{ item.label }}</span>
-                  </a>
-                </li>
-              }
-            </ul>
-          }
+            @if (group.expanded) {
+              <ul class="nav-items">
+                @for (item of group.items; track item.route) {
+                  <li>
+                    <a [routerLink]="item.route" routerLinkActive="active" class="nav-item">
+                      <i [class]="item.icon"></i>
+                      <span class="nav-label">{{ item.label }}</span>
+                    </a>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        }
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user" [title]="auth.userName()">
+          <i class="pi pi-user"></i>
+          <span class="nav-label user-name">{{ auth.userName() }}</span>
         </div>
-      }
-    </nav>
-  </aside>
+        <button type="button" class="logout-btn" (click)="logout()">
+          <i class="pi pi-sign-out"></i>
+          <span class="nav-label">登出</span>
+        </button>
+      </div>
+    </aside>
 
-  <main class="content">
-    <router-outlet />
-  </main>
-</div>
+    <main class="content">
+      <router-outlet />
+    </main>
+  </div>
+} @else {
+  <router-outlet />
+}
 
 <p-toast position="top-right" />
 <p-confirmDialog />
