@@ -10,6 +10,11 @@ const string CorsPolicy = "LocalhostCors";
 
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddScoped<IAppRoleRepository, AppRoleRepository>();
+builder.Services.AddScoped<IAppUserRepository, AppUserRepository>();
+builder.Services.AddScoped<IPartnerRepository, PartnerRepository>();
+builder.Services.AddScoped<ICourseGroupRepository, CourseGroupRepository>();
+builder.Services.AddScoped<ICourseRepository, CourseRepository>();
+builder.Services.AddScoped<IFeaturedPromoItemRepository, FeaturedPromoItemRepository>();
 builder.Services.AddScoped<ILookupRepository, LookupRepository>();
 
 builder.Services.AddControllers();

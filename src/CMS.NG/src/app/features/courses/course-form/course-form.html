@@ -1,0 +1,218 @@
+<form [formGroup]="form" (ngSubmit)="save()">
+  <div class="page-header">
+    <h1>{{ isEdit() ? '編輯課程' : '新增課程' }}</h1>
+
+    <div class="actions">
+      <p-button
+        label="取消"
+        icon="pi pi-times"
+        severity="secondary"
+        [outlined]="true"
+        type="button"
+        (onClick)="cancel()" />
+      <p-button
+        label="儲存"
+        icon="pi pi-check"
+        severity="success"
+        type="submit"
+        [loading]="saving()"
+        [disabled]="loading()" />
+    </div>
+  </div>
+
+  @if (!loading()) {
+    <section class="card">
+      <h2>基本資料</h2>
+
+      <div class="grid">
+        <div class="field">
+          <label for="title">課程名稱 <span class="required-mark">*</span></label>
+          <input pInputText id="title" type="text" formControlName="title" maxlength="200" />
+          @if (invalid('title')) { <div class="field-error">課程名稱為必填，最多 200 字。</div> }
+        </div>
+
+        <div class="field">
+          <label for="officialTitle">官方課程名稱</label>
+          <input pInputText id="officialTitle" type="text" formControlName="officialTitle" maxlength="300" />
+        </div>
+
+        <div class="field">
+          <label for="courseId">簡介代碼 <span class="required-mark">*</span></label>
+          <input pInputText id="courseId" type="text" formControlName="courseId" maxlength="50" />
+          @if (invalid('courseId')) { <div class="field-error">簡介代碼為必填，最多 50 字。</div> }
+        </div>
+
+        <div class="field">
+          <label for="prodCourseId">科目代碼 <span class="required-mark">*</span></label>
+          <input pInputText id="prodCourseId" type="text" formControlName="prodCourseId" maxlength="50" />
+          @if (invalid('prodCourseId')) { <div class="field-error">科目代碼為必填，最多 50 字。</div> }
+        </div>
+
+        <div class="field">
+          <label for="friendlyUrl">友善網址 <span class="required-mark">*</span></label>
+          <input pInputText id="friendlyUrl" type="text" formControlName="friendlyUrl" maxlength="100" />
+          @if (invalid('friendlyUrl')) { <div class="field-error">友善網址為必填，最多 100 字。</div> }
+        </div>
+
+        <div class="field">
+          <label for="displayOrder">顯示順序 <span class="required-mark">*</span></label>
+          <p-inputnumber inputId="displayOrder" formControlName="displayOrder" [min]="0" [useGrouping]="false" />
+        </div>
+
+        <div class="field">
+          <label for="partnerPkid">原廠 <span class="required-mark">*</span></label>
+          <p-select
+            inputId="partnerPkid"
+            [options]="partnerOptions()"
+            optionLabel="label"
+            optionValue="pkid"
+            formControlName="partnerPkid"
+            placeholder="請選擇原廠"
+            appendTo="body"
+            [filter]="true" />
+          @if (invalid('partnerPkid')) { <div class="field-error">原廠為必填。</div> }
+        </div>
+
+        <div class="field">
+          <label for="courseGroupPkid">課程群組</label>
+          <p-select
+            inputId="courseGroupPkid"
+            [options]="courseGroupOptions()"
+            optionLabel="label"
+            optionValue="pkid"
+            formControlName="courseGroupPkid"
+            placeholder="無"
+            appendTo="body"
+            [filter]="true"
+            [showClear]="true" />
+        </div>
+
+        <div class="field">
+          <label for="publishStatusPkid">上架狀態 <span class="required-mark">*</span></label>
+          <p-select
+            inputId="publishStatusPkid"
+            [options]="publishStatusOptions()"
+            optionLabel="label"
+            optionValue="pkid"
+            formControlName="publishStatusPkid"
+            placeholder="請選擇狀態"
+            appendTo="body" />
+          @if (invalid('publishStatusPkid')) { <div class="field-error">上架狀態為必填。</div> }
+        </div>
+
+        <div class="field">
+          <label for="scheduleOn">上架日期 <span class="required-mark">*</span></label>
+          <p-datepicker inputId="scheduleOn" formControlName="scheduleOn" dateFormat="yy/mm/dd" appendTo="body" />
+          @if (invalid('scheduleOn')) { <div class="field-error">上架日期為必填。</div> }
+        </div>
+
+        <div class="field">
+          <label for="scheduleOff">下架日期 <span class="required-mark">*</span></label>
+          <p-datepicker inputId="scheduleOff" formControlName="scheduleOff" dateFormat="yy/mm/dd" appendTo="body" />
+          <small class="hint">選擇上架日期後，會自動帶入 10 年後的下架日期，可再調整。</small>
+          @if (invalid('scheduleOff')) { <div class="field-error">下架日期為必填。</div> }
+        </div>
+
+        <div class="field">
+          <label for="hour">時數 <span class="required-mark">*</span></label>
+          <p-inputnumber inputId="hour" formControlName="hour" [min]="0" [useGrouping]="false" />
+        </div>
+
+        <div class="field">
+          <label for="listPrice">定價 <span class="required-mark">*</span></label>
+          <p-inputnumber inputId="listPrice" formControlName="listPrice" [min]="0" mode="decimal" [maxFractionDigits]="0" />
+        </div>
+
+        <div class="field">
+          <label for="learningCredit">點數 <span class="required-mark">*</span></label>
+          <p-inputnumber inputId="learningCredit" formControlName="learningCredit" [min]="0" mode="decimal" [minFractionDigits]="1" [maxFractionDigits]="1" />
+        </div>
+
+        <div class="field field-inline">
+          <label for="canRepeat">允許重聽</label>
+          <p-toggleswitch inputId="canRepeat" formControlName="canRepeat" />
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>關聯</h2>
+
+      <div class="grid">
+        <div class="field">
+          <label for="certificationPkids">認證</label>
+          <p-multiselect
+            inputId="certificationPkids"
+            [options]="certificationOptions()"
+            optionLabel="label"
+            optionValue="pkid"
+            formControlName="certificationPkids"
+            placeholder="選擇認證（可複選）"
+            appendTo="body"
+            [filter]="true"
+            [maxSelectedLabels]="9999"
+            display="chip" />
+        </div>
+
+        <div class="field">
+          <label for="jobCategoryPkids">職務類別</label>
+          <p-multiselect
+            inputId="jobCategoryPkids"
+            [options]="jobCategoryOptions()"
+            optionLabel="label"
+            optionValue="pkid"
+            formControlName="jobCategoryPkids"
+            placeholder="選擇職務類別（可複選）"
+            appendTo="body"
+            [filter]="true"
+            [maxSelectedLabels]="9999"
+            display="chip" />
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>課程內容</h2>
+
+      <div class="field">
+        <label for="material">教材</label>
+        <textarea pTextarea id="material" formControlName="material" rows="2" maxlength="500"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="objective">課程目標</label>
+        <textarea pTextarea id="objective" formControlName="objective" rows="3" maxlength="4000"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="target">適合對象</label>
+        <textarea pTextarea id="target" formControlName="target" rows="2" maxlength="500"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="prerequisites">先備知識</label>
+        <textarea pTextarea id="prerequisites" formControlName="prerequisites" rows="3" maxlength="4000"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="outline">課程大綱</label>
+        <textarea pTextarea id="outline" formControlName="outline" rows="4"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="towardCertOrExam">考試／認證說明</label>
+        <textarea pTextarea id="towardCertOrExam" formControlName="towardCertOrExam" rows="3"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="note">備註</label>
+        <textarea pTextarea id="note" formControlName="note" rows="2" maxlength="4000"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="otherInfo">其他資訊</label>
+        <textarea pTextarea id="otherInfo" formControlName="otherInfo" rows="2" maxlength="4000"></textarea>
+      </div>
+    </section>
+  }
+</form>

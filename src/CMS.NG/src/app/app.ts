@@ -28,15 +28,36 @@ export class App {
   protected readonly collapsed = signal(false);
 
   /**
-   * Only 系統管理 Admin is populated — the other groups exist in the design but have no features
-   * yet, so they are not rendered. New features add a NavItem to the matching group here.
+   * Groups with no features yet are not rendered at all. New features add a NavItem to the
+   * matching group here (or add the group, if it is the first feature in it).
    */
   protected readonly navGroups = signal<NavGroup[]>([
+    {
+      label: '首頁 Home',
+      icon: 'pi pi-home',
+      expanded: true,
+      items: [
+        { label: '上稿作業 FeaturedPromoItem', icon: 'pi pi-megaphone', route: '/featured-promo-items' }
+      ]
+    },
     {
       label: '系統管理 Admin',
       icon: 'pi pi-shield',
       expanded: true,
-      items: [{ label: '角色 AppRole', icon: 'pi pi-id-card', route: '/app-roles' }]
+      items: [
+        { label: '角色 AppRole', icon: 'pi pi-id-card', route: '/app-roles' },
+        { label: '使用者 AppUser', icon: 'pi pi-users', route: '/app-users' }
+      ]
+    },
+    {
+      label: '課程管理 Course',
+      icon: 'pi pi-book',
+      expanded: true,
+      items: [
+        { label: '合作廠商 Partner', icon: 'pi pi-building', route: '/partners' },
+        { label: '課程群組 CourseGroup', icon: 'pi pi-sitemap', route: '/course-groups' },
+        { label: '課程 Course', icon: 'pi pi-book', route: '/courses' }
+      ]
     }
   ]);
 

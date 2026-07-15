@@ -1,5 +1,6 @@
 using System.Data.Common;
 using CMS.API.Data;
+using CMS.API.Infrastructure;
 using CMS.API.Models;
 using Dapper;
 
@@ -44,7 +45,7 @@ public sealed class AppRoleRepository(IDbConnectionFactory connectionFactory) : 
             new
             {
                 Keyword = keyword,
-                Like = keyword is null ? null : ToLikePattern(keyword),
+                Like = keyword is null ? null : SqlLike.ToPattern(keyword),
                 query.PermissionLevel
             },
             cancellationToken: ct));
@@ -185,16 +186,4 @@ public sealed class AppRoleRepository(IDbConnectionFactory connectionFactory) : 
             ids.Select(u => new { UserId = u, RoleId = roleId }),
             tx, cancellationToken: ct));
     }
-
-    /// <summary>
-    /// Escapes LIKE metacharacters before wrapping in wildcards. Without this a keyword of
-    /// "%" or "_" silently matches every row. Pairs with ESCAPE '\' in the SQL.
-    /// </summary>
-    internal static string ToLikePattern(string keyword) =>
-        "%" + keyword
-            .Replace("\\", "\\\\")
-            .Replace("%", "\\%")
-            .Replace("_", "\\_")
-            .Replace("[", "\\[")
-        + "%";
 }

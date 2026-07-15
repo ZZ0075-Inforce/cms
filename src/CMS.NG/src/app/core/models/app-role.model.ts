@@ -35,3 +35,14 @@ export const EMPTY_APP_ROLE_QUERY: AppRoleQuery = {
   keyword: null,
   permissionLevel: null
 };
+
+/** Slim AppRole row from GET /api/lookups/app-roles (AppRole is the FK target of AppUserRole). */
+export interface AppRoleLookup {
+  roleId: string;
+  roleName: string;
+}
+
+/** Option label used where a role is shown in a dropdown or chip: "Administrator (Admin)". */
+export function appRoleLabel(role: AppRoleLookup): string {
+  return `${role.roleName} (${role.roleId})`;
+}

@@ -1,0 +1,83 @@
+@if (loading()) {
+  <div class="state">載入中…</div>
+} @else if (notFound()) {
+  <div class="state">
+    <p>找不到這個使用者。</p>
+    <p-button label="回到清單" icon="pi pi-arrow-left" routerLink="/app-users" />
+  </div>
+} @else if (user(); as item) {
+  <div class="page-header">
+    <div class="titles">
+      <h1>檢視使用者</h1>
+      <span class="subtitle">{{ item.userId }}</span>
+    </div>
+
+    <div class="actions">
+      <p-button
+        label="回到清單"
+        icon="pi pi-arrow-left"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/app-users" />
+      <p-button
+        label="編輯"
+        icon="pi pi-pencil"
+        [routerLink]="['/app-users', item.userId, 'edit']" />
+      <p-button
+        label="重設密碼"
+        icon="pi pi-key"
+        severity="warn"
+        [outlined]="true"
+        (onClick)="confirmResetPassword()" />
+      <p-button
+        label="刪除"
+        icon="pi pi-trash"
+        severity="danger"
+        [outlined]="true"
+        (onClick)="confirmDelete()" />
+    </div>
+  </div>
+
+  <section class="card">
+    <h2>使用者資料</h2>
+
+    <dl class="detail-grid">
+      <dt>主代碼</dt>
+      <dd>{{ item.pkid }}</dd>
+
+      <dt>使用者代碼</dt>
+      <dd class="strong">{{ item.userId }}</dd>
+
+      <dt>使用者名稱</dt>
+      <dd>{{ item.userName }}</dd>
+
+      <dt>啟用</dt>
+      <dd>
+        <p-tag
+          [value]="item.isActive ? '啟用' : '停用'"
+          [severity]="item.isActive ? 'success' : 'danger'" />
+      </dd>
+
+      <dt>密碼更新時間</dt>
+      <dd>
+        {{ item.passwordUpdatedTime
+            ? ((item.passwordUpdatedTime + 'Z') | date:'yyyy-MM-dd HH:mm')
+            : '尚未設定' }}
+      </dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <h2>角色</h2>
+
+    @if (roleLabels().length) {
+      <div class="chips">
+        @for (label of roleLabels(); track label) {
+          <p-chip [label]="label" icon="pi pi-id-card" />
+        }
+      </div>
+    } @else {
+      <p class="muted">尚未指派角色。</p>
+    }
+  </section>
+}

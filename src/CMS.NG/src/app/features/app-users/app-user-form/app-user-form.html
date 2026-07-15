@@ -1,0 +1,91 @@
+<form [formGroup]="form" (ngSubmit)="save()">
+  <div class="page-header">
+    <h1>{{ isEdit() ? '編輯使用者' : '新增使用者' }}</h1>
+
+    <div class="actions">
+      <p-button
+        label="取消"
+        icon="pi pi-times"
+        severity="secondary"
+        [outlined]="true"
+        type="button"
+        (onClick)="cancel()" />
+      <p-button
+        label="儲存"
+        icon="pi pi-check"
+        severity="success"
+        type="submit"
+        [loading]="saving()"
+        [disabled]="loading()" />
+    </div>
+  </div>
+
+  @if (!loading()) {
+    <section class="card">
+      <h2>使用者資料</h2>
+
+      <div class="field">
+        <label for="userId">使用者代碼 <span class="required-mark">*</span></label>
+        <input
+          pInputText
+          id="userId"
+          type="text"
+          formControlName="userId"
+          placeholder="請輸入使用者代碼（可為 Email）"
+          maxlength="200" />
+        @if (isEdit()) {
+          <small class="hint">使用者代碼為主鍵，建立後不可修改。</small>
+        }
+        @if (invalid('userId')) {
+          <div class="field-error">
+            @if (form.controls.userId.hasError('required')) {
+              使用者代碼為必填。
+            } @else if (form.controls.userId.hasError('pattern')) {
+              使用者代碼不可包含空白或斜線。
+            } @else {
+              使用者代碼長度不可超過 200 字。
+            }
+          </div>
+        }
+      </div>
+
+      <div class="field">
+        <label for="userName">使用者名稱 <span class="required-mark">*</span></label>
+        <input pInputText id="userName" type="text" formControlName="userName" maxlength="200" />
+        @if (invalid('userName')) {
+          <div class="field-error">使用者名稱為必填，且長度不可超過 200 字。</div>
+        }
+      </div>
+
+      <div class="field">
+        <label for="isActive">啟用</label>
+        <p-toggleswitch inputId="isActive" formControlName="isActive" />
+      </div>
+
+      @if (!isEdit()) {
+        <small class="hint">新使用者的密碼會自動設為系統預設密碼。</small>
+      }
+    </section>
+
+    <section class="card">
+      <h2>角色</h2>
+
+      <div class="field">
+        <p-multiselect
+          inputId="roleIds"
+          formControlName="roleIds"
+          [options]="roleOptions()"
+          optionLabel="label"
+          optionValue="roleId"
+          placeholder="選擇角色（可複選）"
+          appendTo="body"
+          [filter]="true"
+          [showToggleAll]="true"
+          [maxSelectedLabels]="9999"
+          display="chip"
+          styleClass="role-multiselect" />
+        <small class="hint">指定這個使用者擁有哪些角色。</small>
+      </div>
+    </section>
+  }
+</form>

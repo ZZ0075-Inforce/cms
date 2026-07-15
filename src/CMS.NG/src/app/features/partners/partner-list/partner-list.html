@@ -1,0 +1,126 @@
+<div class="page-header">
+  <div class="titles">
+    <h1>合作廠商 Partner</h1>
+    <span class="subtitle">課程的合作原廠</span>
+  </div>
+
+  <div class="actions">
+    <p-button
+      label="搜尋條件"
+      icon="pi pi-filter"
+      severity="secondary"
+      [outlined]="true"
+      [badge]="hasActiveFilters ? '!' : undefined"
+      (onClick)="filterDrawerVisible.set(true)" />
+
+    <p-button
+      label="新增"
+      icon="pi pi-plus"
+      severity="success"
+      routerLink="/partners/new" />
+  </div>
+</div>
+
+<div class="table-card">
+  <p-table
+    [value]="partners()"
+    [loading]="loading()"
+    dataKey="pkid"
+    [paginator]="true"
+    [rows]="page.rows"
+    [first]="page.first"
+    [rowsPerPageOptions]="[10, 20, 50]"
+    [sortField]="sort.sortField"
+    [sortOrder]="sort.sortOrder"
+    (onSort)="onSort($event)"
+    (onPage)="onPage($event)"
+    paginatorPosition="top"
+    currentPageReportTemplate="{first}–{last} 筆，共 {totalRecords} 筆"
+    [showCurrentPageReport]="true"
+    styleClass="p-datatable-sm p-datatable-gridlines">
+
+    <ng-template #header>
+      <tr>
+        <th pSortableColumn="pkid" style="width: 6rem">主代碼 <p-sortIcon field="pkid" /></th>
+        <th pSortableColumn="name">廠商名稱 <p-sortIcon field="name" /></th>
+        <th pSortableColumn="appKey" style="width: 8rem">廠商代碼 <p-sortIcon field="appKey" /></th>
+        <th pSortableColumn="nameOnPartnerMenu">選單顯示名稱 <p-sortIcon field="nameOnPartnerMenu" /></th>
+        <th pSortableColumn="nameOnCourseDetailPage">課程明細頁名稱 <p-sortIcon field="nameOnCourseDetailPage" /></th>
+        <th pSortableColumn="displayOrder" style="width: 8rem">顯示順序 <p-sortIcon field="displayOrder" /></th>
+        <th pSortableColumn="imageFilename">圖片檔名 <p-sortIcon field="imageFilename" /></th>
+        <th pSortableColumn="courseCount" style="width: 8rem">對應課程數 <p-sortIcon field="courseCount" /></th>
+        <th style="width: 10rem">操作</th>
+      </tr>
+    </ng-template>
+
+    <ng-template #body let-partner>
+      <tr>
+        <td>{{ partner.pkid }}</td>
+        <td class="cell-strong">{{ partner.name }}</td>
+        <td>{{ partner.appKey }}</td>
+        <td>{{ partner.nameOnPartnerMenu }}</td>
+        <td>{{ partner.nameOnCourseDetailPage }}</td>
+        <td class="cell-number">{{ partner.displayOrder }}</td>
+        <td>{{ partner.imageFilename || '—' }}</td>
+        <td class="cell-number">{{ partner.courseCount }}</td>
+        <td>
+          <div class="row-actions">
+            <p-button
+              icon="pi pi-eye"
+              severity="secondary"
+              [text]="true"
+              [rounded]="true"
+              pTooltip="檢視"
+              [attr.aria-label]="'檢視 ' + partner.name"
+              (onClick)="view(partner)" />
+            <p-button
+              icon="pi pi-pencil"
+              severity="info"
+              [text]="true"
+              [rounded]="true"
+              pTooltip="編輯"
+              [attr.aria-label]="'編輯 ' + partner.name"
+              (onClick)="edit(partner)" />
+            <p-button
+              icon="pi pi-trash"
+              severity="danger"
+              [text]="true"
+              [rounded]="true"
+              pTooltip="刪除"
+              [attr.aria-label]="'刪除 ' + partner.name"
+              (onClick)="confirmDelete(partner)" />
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="9" class="empty">查無資料</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-drawer
+  [(visible)]="filterDrawerVisible"
+  header="搜尋條件"
+  position="right"
+  styleClass="filter-drawer">
+
+  <div class="filter-field">
+    <label for="filter-keyword">關鍵字</label>
+    <input
+      pInputText
+      id="filter-keyword"
+      type="text"
+      placeholder="廠商名稱／代碼／顯示名稱"
+      [(ngModel)]="draftFilters.keyword"
+      (keyup.enter)="applyFilters()" />
+  </div>
+
+  <div class="filter-actions">
+    <p-button label="清除" icon="pi pi-times" severity="secondary" [outlined]="true" (onClick)="clearFilters()" />
+    <p-button label="搜尋" icon="pi pi-search" (onClick)="applyFilters()" />
+  </div>
+</p-drawer>

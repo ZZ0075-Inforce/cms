@@ -31,8 +31,23 @@ describe('App shell', () => {
     expect(text).toContain('系統管理 Admin');
     expect(text).toContain('角色 AppRole');
 
-    const link: HTMLAnchorElement | null = fixture.nativeElement.querySelector('a.nav-item');
+    // Select by href, not "first nav item" — the 首頁 Home group now leads the sidebar.
+    const link: HTMLAnchorElement | null =
+      fixture.nativeElement.querySelector('a.nav-item[href="/app-roles"]');
     expect(link).not.toBeNull();
     expect(link!.getAttribute('href')).toBe('/app-roles');
+  });
+
+  it('renders the 首頁 Home group with the 上稿作業 FeaturedPromoItem link', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('首頁 Home');
+    expect(text).toContain('上稿作業 FeaturedPromoItem');
+
+    const link: HTMLAnchorElement | null =
+      fixture.nativeElement.querySelector('a.nav-item[href="/featured-promo-items"]');
+    expect(link).not.toBeNull();
   });
 });

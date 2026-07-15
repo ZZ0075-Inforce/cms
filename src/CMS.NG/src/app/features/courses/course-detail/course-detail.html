@@ -1,0 +1,157 @@
+@if (loading()) {
+  <div class="state">載入中…</div>
+} @else if (notFound()) {
+  <div class="state">
+    <p>找不到這個課程。</p>
+    <p-button label="回到清單" icon="pi pi-arrow-left" routerLink="/courses" />
+  </div>
+} @else if (course(); as item) {
+  <div class="page-header">
+    <div class="titles">
+      <h1>檢視課程</h1>
+      <span class="subtitle">{{ item.courseId }} {{ item.title }}</span>
+    </div>
+
+    <div class="actions">
+      <p-button
+        label="回到清單"
+        icon="pi pi-arrow-left"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/courses" />
+      <p-button
+        label="編輯"
+        icon="pi pi-pencil"
+        [routerLink]="['/courses', item.pkid, 'edit']" />
+      <p-button
+        label="刪除"
+        icon="pi pi-trash"
+        severity="danger"
+        [outlined]="true"
+        (onClick)="confirmDelete()" />
+    </div>
+  </div>
+
+  <section class="card">
+    <h2>基本資料</h2>
+
+    <dl class="detail-grid">
+      <dt>主代碼</dt>
+      <dd>{{ item.pkid }}</dd>
+
+      <dt>課程名稱</dt>
+      <dd class="strong">{{ item.title }}</dd>
+
+      <dt>官方課程名稱</dt>
+      <dd>{{ item.officialTitle || '—' }}</dd>
+
+      <dt>簡介代碼</dt>
+      <dd>{{ item.courseId }}</dd>
+
+      <dt>科目代碼</dt>
+      <dd>{{ item.prodCourseId }}</dd>
+
+      <dt>友善網址</dt>
+      <dd>{{ item.friendlyUrl }}</dd>
+
+      <dt>顯示順序</dt>
+      <dd>{{ item.displayOrder }}</dd>
+
+      <dt>原廠</dt>
+      <dd><a [routerLink]="['/partners', item.partnerPkid]">{{ item.partnerName }}</a></dd>
+
+      <dt>課程群組</dt>
+      <dd>
+        @if (item.courseGroupPkid) {
+          <a [routerLink]="['/course-groups', item.courseGroupPkid]">{{ item.courseGroupName }}</a>
+        } @else {
+          —
+        }
+      </dd>
+
+      <dt>上架狀態</dt>
+      <dd>{{ item.publishStatusName }}</dd>
+
+      <dt>上架日期</dt>
+      <dd>{{ item.scheduleOn | date:'yyyy/MM/dd' }}</dd>
+
+      <dt>下架日期</dt>
+      <dd>{{ item.scheduleOff | date:'yyyy/MM/dd' }}</dd>
+
+      <dt>時數</dt>
+      <dd>{{ item.hour }}</dd>
+
+      <dt>定價</dt>
+      <dd>{{ item.listPrice }}</dd>
+
+      <dt>點數</dt>
+      <dd>{{ item.learningCredit }}</dd>
+
+      <dt>允許重聽</dt>
+      <dd>{{ item.canRepeat ? '是' : '否' }}</dd>
+    </dl>
+
+    <div class="qr-block">
+      <app-qr-code
+        [value]="qrUrl(item)"
+        [title]="item.courseId"
+        [fileName]="'QR_' + item.courseId" />
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>課程內容</h2>
+
+    <dl class="detail-grid">
+      <dt>教材</dt>
+      <dd class="pre">{{ item.material || '—' }}</dd>
+
+      <dt>課程目標</dt>
+      <dd class="pre">{{ item.objective || '—' }}</dd>
+
+      <dt>適合對象</dt>
+      <dd class="pre">{{ item.target || '—' }}</dd>
+
+      <dt>先備知識</dt>
+      <dd class="pre">{{ item.prerequisites || '—' }}</dd>
+
+      <dt>課程大綱</dt>
+      <dd class="pre">{{ item.outline || '—' }}</dd>
+
+      <dt>考試／認證說明</dt>
+      <dd class="pre">{{ item.towardCertOrExam || '—' }}</dd>
+
+      <dt>備註</dt>
+      <dd class="pre">{{ item.note || '—' }}</dd>
+
+      <dt>其他資訊</dt>
+      <dd class="pre">{{ item.otherInfo || '—' }}</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <h2>認證</h2>
+    @if (certificationLabels().length) {
+      <div class="chips">
+        @for (label of certificationLabels(); track label) {
+          <p-chip [label]="label" icon="pi pi-verified" />
+        }
+      </div>
+    } @else {
+      <p class="muted">尚未關聯認證。</p>
+    }
+  </section>
+
+  <section class="card">
+    <h2>職務類別</h2>
+    @if (jobCategoryLabels().length) {
+      <div class="chips">
+        @for (label of jobCategoryLabels(); track label) {
+          <p-chip [label]="label" icon="pi pi-briefcase" />
+        }
+      </div>
+    } @else {
+      <p class="muted">尚未關聯職務類別。</p>
+    }
+  </section>
+}

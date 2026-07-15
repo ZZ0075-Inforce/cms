@@ -1,0 +1,36 @@
+<form [formGroup]="form" (ngSubmit)="save()">
+  <div class="page-header">
+    <h1>{{ isEdit() ? '編輯課程群組' : '新增課程群組' }}</h1>
+
+    <div class="actions">
+      <p-button
+        label="取消"
+        icon="pi pi-times"
+        severity="secondary"
+        [outlined]="true"
+        type="button"
+        (onClick)="cancel()" />
+      <p-button
+        label="儲存"
+        icon="pi pi-check"
+        severity="success"
+        type="submit"
+        [loading]="saving()"
+        [disabled]="loading()" />
+    </div>
+  </div>
+
+  @if (!loading()) {
+    <section class="card">
+      <h2>群組資料</h2>
+
+      <div class="field">
+        <label for="description">群組名稱 <span class="required-mark">*</span></label>
+        <input pInputText id="description" type="text" formControlName="description" maxlength="100" />
+        @if (invalid('description')) {
+          <div class="field-error">群組名稱為必填，且長度不可超過 100 字。</div>
+        }
+      </div>
+    </section>
+  }
+</form>

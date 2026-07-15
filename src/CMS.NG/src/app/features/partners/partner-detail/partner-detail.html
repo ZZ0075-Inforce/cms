@@ -1,0 +1,64 @@
+@if (loading()) {
+  <div class="state">載入中…</div>
+} @else if (notFound()) {
+  <div class="state">
+    <p>找不到這個廠商。</p>
+    <p-button label="回到清單" icon="pi pi-arrow-left" routerLink="/partners" />
+  </div>
+} @else if (partner(); as item) {
+  <div class="page-header">
+    <div class="titles">
+      <h1>檢視廠商</h1>
+      <span class="subtitle">{{ item.name }}</span>
+    </div>
+
+    <div class="actions">
+      <p-button
+        label="回到清單"
+        icon="pi pi-arrow-left"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/partners" />
+      <p-button
+        label="編輯"
+        icon="pi pi-pencil"
+        [routerLink]="['/partners', item.pkid, 'edit']" />
+      <p-button
+        label="刪除"
+        icon="pi pi-trash"
+        severity="danger"
+        [outlined]="true"
+        (onClick)="confirmDelete()" />
+    </div>
+  </div>
+
+  <section class="card">
+    <h2>廠商資料</h2>
+
+    <dl class="detail-grid">
+      <dt>主代碼</dt>
+      <dd>{{ item.pkid }}</dd>
+
+      <dt>廠商名稱</dt>
+      <dd class="strong">{{ item.name }}</dd>
+
+      <dt>廠商代碼</dt>
+      <dd>{{ item.appKey }}</dd>
+
+      <dt>選單顯示名稱</dt>
+      <dd>{{ item.nameOnPartnerMenu }}</dd>
+
+      <dt>課程明細頁名稱</dt>
+      <dd>{{ item.nameOnCourseDetailPage }}</dd>
+
+      <dt>顯示順序</dt>
+      <dd>{{ item.displayOrder }}</dd>
+
+      <dt>圖片檔名</dt>
+      <dd>{{ item.imageFilename || '—' }}</dd>
+
+      <dt>對應課程數</dt>
+      <dd>{{ item.courseCount }}</dd>
+    </dl>
+  </section>
+}

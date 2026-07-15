@@ -1,0 +1,135 @@
+<div class="page-header">
+  <div class="titles">
+    <h1>使用者 AppUser</h1>
+    <span class="subtitle">系統登入帳號</span>
+  </div>
+
+  <div class="actions">
+    <p-button
+      label="搜尋條件"
+      icon="pi pi-filter"
+      severity="secondary"
+      [outlined]="true"
+      [badge]="hasActiveFilters ? '!' : undefined"
+      (onClick)="filterDrawerVisible.set(true)" />
+
+    <p-button
+      label="新增"
+      icon="pi pi-plus"
+      severity="success"
+      routerLink="/app-users/new" />
+  </div>
+</div>
+
+<div class="table-card">
+  <p-table
+    [value]="users()"
+    [loading]="loading()"
+    dataKey="userId"
+    [paginator]="true"
+    [rows]="page.rows"
+    [first]="page.first"
+    [rowsPerPageOptions]="[10, 20, 50]"
+    [sortField]="sort.sortField"
+    [sortOrder]="sort.sortOrder"
+    (onSort)="onSort($event)"
+    (onPage)="onPage($event)"
+    paginatorPosition="top"
+    currentPageReportTemplate="{first}–{last} 筆，共 {totalRecords} 筆"
+    [showCurrentPageReport]="true"
+    styleClass="p-datatable-sm p-datatable-gridlines">
+
+    <ng-template #header>
+      <tr>
+        <th pSortableColumn="pkid" style="width: 6rem">主代碼 <p-sortIcon field="pkid" /></th>
+        <th pSortableColumn="userId">使用者代碼 <p-sortIcon field="userId" /></th>
+        <th pSortableColumn="userName">使用者名稱 <p-sortIcon field="userName" /></th>
+        <th pSortableColumn="isActive" style="width: 7rem">啟用 <p-sortIcon field="isActive" /></th>
+        <th pSortableColumn="roleCount" style="width: 7rem">角色數 <p-sortIcon field="roleCount" /></th>
+        <th style="width: 10rem">操作</th>
+      </tr>
+    </ng-template>
+
+    <ng-template #body let-user>
+      <tr>
+        <td>{{ user.pkid }}</td>
+        <td class="cell-strong">{{ user.userId }}</td>
+        <td>{{ user.userName }}</td>
+        <td>
+          <p-tag
+            [value]="user.isActive ? '啟用' : '停用'"
+            [severity]="user.isActive ? 'success' : 'danger'" />
+        </td>
+        <td class="cell-number">{{ user.roleCount }}</td>
+        <td>
+          <div class="row-actions">
+            <p-button
+              icon="pi pi-eye"
+              severity="secondary"
+              [text]="true"
+              [rounded]="true"
+              pTooltip="檢視"
+              [attr.aria-label]="'檢視 ' + user.userId"
+              (onClick)="view(user)" />
+            <p-button
+              icon="pi pi-pencil"
+              severity="info"
+              [text]="true"
+              [rounded]="true"
+              pTooltip="編輯"
+              [attr.aria-label]="'編輯 ' + user.userId"
+              (onClick)="edit(user)" />
+            <p-button
+              icon="pi pi-trash"
+              severity="danger"
+              [text]="true"
+              [rounded]="true"
+              pTooltip="刪除"
+              [attr.aria-label]="'刪除 ' + user.userId"
+              (onClick)="confirmDelete(user)" />
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+
+    <ng-template #emptymessage>
+      <tr>
+        <td colspan="6" class="empty">查無資料</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-drawer
+  [(visible)]="filterDrawerVisible"
+  header="搜尋條件"
+  position="right"
+  styleClass="filter-drawer">
+
+  <div class="filter-field">
+    <label for="filter-keyword">關鍵字</label>
+    <input
+      pInputText
+      id="filter-keyword"
+      type="text"
+      placeholder="使用者代碼／使用者名稱"
+      [(ngModel)]="draftFilters.keyword"
+      (keyup.enter)="applyFilters()" />
+  </div>
+
+  <div class="filter-field">
+    <label for="filter-active">啟用</label>
+    <p-select
+      inputId="filter-active"
+      [options]="isActiveOptions"
+      optionLabel="label"
+      optionValue="value"
+      [(ngModel)]="draftFilters.isActive"
+      appendTo="body" />
+  </div>
+
+  <div class="filter-actions">
+    <p-button label="清除" icon="pi pi-times" severity="secondary" [outlined]="true" (onClick)="clearFilters()" />
+    <p-button label="搜尋" icon="pi pi-search" (onClick)="applyFilters()" />
+  </div>
+</p-drawer>
