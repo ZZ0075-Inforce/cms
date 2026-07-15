@@ -1,7 +1,11 @@
-import { Component, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { AuthService } from '@core/services/auth.service';
+
+/** The admin-only sidebar group — shown only to users whose roles include 'Admin'. */
+const ADMIN_GROUP_LABEL = '系統管理 Admin';
 
 /** A leaf item in the sidebar. */
 export interface NavItem {
@@ -25,6 +29,7 @@ export interface NavGroup {
   styleUrl: './app.scss'
 })
 export class App {
+  protected readonly auth = inject(AuthService);
   protected readonly collapsed = signal(false);
 
   /**
@@ -61,6 +66,16 @@ export class App {
     }
   ]);
 
+  /**
+   * The groups actually rendered: the 系統管理 Admin group is dropped unless the signed-in user holds
+   * the 'Admin' role (read from the token, no extra API call). Object references are preserved, so
+   * toggleGroup's identity check still works.
+   */
+  protected readonly visibleNavGroups = computed(() => {
+    const isAdmin = this.auth.roles().includes('Admin');
+    return this.navGroups().filter(group => group.label !== ADMIN_GROUP_LABEL || isAdmin);
+  });
+
   protected toggleSidebar(): void {
     this.collapsed.update(value => !value);
   }
@@ -71,5 +86,9 @@ export class App {
         group === target ? { ...group, expanded: !group.expanded } : group
       )
     );
+  }
+
+  protected logout(): void {
+    this.auth.logout();
   }
 }

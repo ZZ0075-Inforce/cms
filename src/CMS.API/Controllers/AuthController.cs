@@ -1,6 +1,7 @@
 using CMS.API.Infrastructure;
 using CMS.API.Models;
 using CMS.API.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CMS.API.Controllers;
@@ -13,6 +14,7 @@ namespace CMS.API.Controllers;
 /// UserId was unknown, the password wrong, or the account inactive. PasswordHash is never returned.
 /// </summary>
 [ApiController]
+[AllowAnonymous] // The one public controller: logging in cannot itself require a token.
 [Route("api/[controller]")]
 [Produces("application/json")]
 public class AuthController(IAuthRepository repository) : ControllerBase
