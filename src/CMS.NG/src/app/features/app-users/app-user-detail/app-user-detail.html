@@ -24,12 +24,14 @@
         label="編輯"
         icon="pi pi-pencil"
         [routerLink]="['/app-users', item.userId, 'edit']" />
-      <p-button
-        label="重設密碼"
-        icon="pi pi-key"
-        severity="warn"
-        [outlined]="true"
-        (onClick)="confirmResetPassword()" />
+      @if (isAdmin()) {
+        <p-button
+          label="重設密碼"
+          icon="pi pi-key"
+          severity="warn"
+          [outlined]="true"
+          (onClick)="confirmResetPassword()" />
+      }
       <p-button
         label="刪除"
         icon="pi pi-trash"

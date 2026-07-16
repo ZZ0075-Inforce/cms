@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
@@ -10,6 +10,7 @@ import { ChipModule } from 'primeng/chip';
 import { TagModule } from 'primeng/tag';
 
 import { AppUserService } from '@core/services/app-user.service';
+import { AuthService } from '@core/services/auth.service';
 import { LookupService } from '@core/services/lookup.service';
 import { AppUser } from '@core/models/app-user.model';
 import { AppRoleLookup, appRoleLabel } from '@core/models/app-role.model';
@@ -23,6 +24,7 @@ import { RowAuditBadge } from '@shared/row-audit-badge/row-audit-badge';
 })
 export class AppUserDetail implements OnInit {
   private readonly service = inject(AppUserService);
+  private readonly auth = inject(AuthService);
   private readonly lookupService = inject(LookupService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -34,6 +36,11 @@ export class AppUserDetail implements OnInit {
   protected readonly notFound = signal(false);
   /** Assigned roles rendered as "RoleName (RoleId)" labels rather than raw ids. */
   protected readonly roleLabels = signal<string[]>([]);
+  /**
+   * Only Admins may reset a password. Gates the 重設密碼 button so a non-Admin never sees it; the
+   * backend enforces the same rule with [Authorize(Roles = "Admin")] (a hidden button is not security).
+   */
+  protected readonly isAdmin = computed(() => this.auth.roles().includes('Admin'));
 
   ngOnInit(): void {
     const userId = this.route.snapshot.paramMap.get('id');

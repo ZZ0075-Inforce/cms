@@ -8,6 +8,7 @@ import { of, throwError } from 'rxjs';
 
 import { AppUserDetail } from './app-user-detail';
 import { AppUserService } from '@core/services/app-user.service';
+import { AuthService } from '@core/services/auth.service';
 import { LookupService } from '@core/services/lookup.service';
 import { AppUser } from '@core/models/app-user.model';
 import { AppRoleLookup } from '@core/models/app-role.model';
@@ -33,7 +34,9 @@ describe('AppUserDetail', () => {
     roleIds: ['Admin']
   };
 
-  async function setup(failWith?: number): Promise<void> {
+  // The signed-in caller's roles drive the Admin-only 重設密碼 button; default to Admin so the
+  // existing behaviour tests still see it. Pass [] for a non-Admin caller.
+  async function setup(failWith?: number, signedInRoles: string[] = ['Admin']): Promise<void> {
     userService = jasmine.createSpyObj<AppUserService>('AppUserService',
       ['getById', 'remove', 'resetPassword']);
     lookupService = jasmine.createSpyObj<LookupService>('LookupService', ['appRoles']);
@@ -55,6 +58,7 @@ describe('AppUserDetail', () => {
         { provide: RowAuditService, useValue: { history: () => of([]) } },
         provideRouter([]),
         { provide: AppUserService, useValue: userService },
+        { provide: AuthService, useValue: { roles: () => signedInRoles } },
         { provide: LookupService, useValue: lookupService },
         { provide: ConfirmationService, useValue: confirmationService },
         MessageService,
@@ -115,5 +119,19 @@ describe('AppUserDetail', () => {
 
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('找不到這個使用者');
+  });
+
+  it('renders the 重設密碼 button for an Admin caller', async () => {
+    await setup(undefined, ['Admin']);
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('重設密碼');
+  });
+
+  it('hides the 重設密碼 button from a non-Admin caller', async () => {
+    await setup(undefined, ['User']);
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).not.toContain('重設密碼');
   });
 });

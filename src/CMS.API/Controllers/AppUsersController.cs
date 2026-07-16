@@ -1,6 +1,7 @@
 using CMS.API.Infrastructure;
 using CMS.API.Models;
 using CMS.API.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 
@@ -104,9 +105,15 @@ public class AppUsersController(IAppUserRepository repository) : ControllerBase
     /// <summary>
     /// Resets the user's password to the SysConfig default (re-hashed). Accepts no password value —
     /// the default is the single source, matching the create path.
+    ///
+    /// Restricted to the <c>Admin</c> role: the JWT carries one <c>role</c> claim per AppUserRole.RoleId
+    /// (see <see cref="JwtTokenGenerator.RoleClaim"/>), and <c>RoleClaimType</c> is pointed at it, so an
+    /// authenticated caller without the <c>Admin</c> RoleId is rejected with 403 Forbidden.
     /// </summary>
+    [Authorize(Roles = "Admin")]
     [HttpPost("{id}/reset-password")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ResetPassword(string id, CancellationToken ct)
     {
