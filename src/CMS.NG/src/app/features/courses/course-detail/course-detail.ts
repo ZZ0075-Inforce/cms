@@ -2,16 +2,14 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
 
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { ChipModule } from 'primeng/chip';
 
 import { CourseService } from '@core/services/course.service';
-import { LookupService } from '@core/services/lookup.service';
-import { Course, CertificationLookup, JobCategoryLookup } from '@core/models/course.model';
+import { CourseViewService } from '@core/services/course-view.service';
+import { Course } from '@core/models/course.model';
 import { QrCode } from '@shared/qr-code/qr-code';
 import { RowAuditBadge } from '@shared/row-audit-badge/row-audit-badge';
 
@@ -23,7 +21,7 @@ import { RowAuditBadge } from '@shared/row-audit-badge/row-audit-badge';
 })
 export class CourseDetail implements OnInit {
   private readonly service = inject(CourseService);
-  private readonly lookupService = inject(LookupService);
+  private readonly courseView = inject(CourseViewService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly confirmationService = inject(ConfirmationService);
@@ -44,17 +42,11 @@ export class CourseDetail implements OnInit {
       return;
     }
 
-    forkJoin({
-      course: this.service.getById(pkid),
-      certifications: this.lookupService.certifications().pipe(catchError(() => of([] as CertificationLookup[]))),
-      jobCategories: this.lookupService.jobCategories().pipe(catchError(() => of([] as JobCategoryLookup[])))
-    }).subscribe({
-      next: ({ course, certifications, jobCategories }) => {
+    this.courseView.load(pkid).subscribe({
+      next: ({ course, certificationLabels, jobCategoryLabels }) => {
         this.course.set(course);
-        this.certificationLabels.set(
-          resolve(course.certificationPkids, certifications, c => c.pkid, c => c.title));
-        this.jobCategoryLabels.set(
-          resolve(course.jobCategoryPkids, jobCategories, j => j.pkid, j => j.description));
+        this.certificationLabels.set(certificationLabels);
+        this.jobCategoryLabels.set(jobCategoryLabels);
         this.loading.set(false);
       },
       error: () => {
@@ -101,10 +93,4 @@ export class CourseDetail implements OnInit {
         })
     });
   }
-}
-
-/** Maps a list of pkids to their labels via a lookup, keeping raw ids the lookup is missing. */
-function resolve<T>(pkids: number[], options: T[], keyOf: (o: T) => number, labelOf: (o: T) => string): string[] {
-  const byId = new Map(options.map(o => [keyOf(o), labelOf(o)]));
-  return pkids.map(id => byId.get(id) ?? `#${id}`);
 }

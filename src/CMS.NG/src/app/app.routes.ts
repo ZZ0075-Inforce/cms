@@ -184,6 +184,14 @@ export const routes: Routes = [
           import('@features/courses/course-form/course-form').then(m => m.CourseForm),
         title: '編輯課程'
       },
+      // The customer-facing print/PDF view. Sits inside the guarded parent like every other course
+      // route, so it needs no permission of its own — whoever may view the course may print it.
+      {
+        path: 'courses/:id/print',
+        loadComponent: () =>
+          import('@features/courses/course-print/course-print').then(m => m.CoursePrint),
+        title: '課程資訊 PDF'
+      },
       {
         path: 'courses/:id',
         loadComponent: () =>

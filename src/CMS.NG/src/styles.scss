@@ -37,3 +37,66 @@ body {
   font-size: 0.78rem;
   margin-top: 0.25rem;
 }
+
+/* ---------------------------------------------------------------------------
+   Print / 另存 PDF.
+
+   These rules live here, globally, and not in a feature's .scss on purpose: a
+   component's styles are view-encapsulated, so they cannot select `.sidebar` or
+   `.app-shell` — those belong to the App component, which wraps every guarded
+   route in `.app-shell > main.content` (see app.html). Only a global sheet can
+   strip that chrome for printing.
+   --------------------------------------------------------------------------- */
+@media print {
+  /* Chrome/Edge print the page title, date, page numbers AND the full URL into the
+     page margins by default. On a course PDF headed for a customer that would stamp
+     the internal route and the record pkid onto every page — the exact internal data
+     the print view is built to exclude. A zero @page margin drops them; the print
+     view supplies its own padding. */
+  @page {
+    margin: 0;
+  }
+
+  html,
+  body {
+    height: auto;
+    background: #fff;
+  }
+
+  /* Chrome: the nav, the overlays, and anything a page marks screen-only. A button is never
+     useful on paper, so every one goes — that covers the print view's own toolbar and the QR
+     widget's download button without each having to opt out by hand. */
+  .sidebar,
+  p-toast,
+  p-confirmdialog,
+  button,
+  .p-button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* `.app-shell` is a flex sidebar+content layout and `.content` is a padded, tinted
+     column. Hiding the sidebar alone would still print that constrained, grey column,
+     so both are flattened to a full-bleed white page. */
+  .app-shell {
+    display: block;
+    min-height: 0;
+  }
+
+  .content {
+    padding: 0;
+    background: #fff;
+  }
+
+  /* Browsers drop background colours when printing. PrimeNG's p-chip (認證 / 職務類別)
+     draws itself with a background, so without this it prints as invisible text. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Keep a card from being split across a page break mid-section. */
+  .card {
+    break-inside: avoid;
+  }
+}

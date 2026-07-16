@@ -21,6 +21,12 @@
         [outlined]="true"
         routerLink="/courses" />
       <p-button
+        label="另存 PDF"
+        icon="pi pi-file-pdf"
+        severity="secondary"
+        [outlined]="true"
+        [routerLink]="['/courses', item.pkid, 'print']" />
+      <p-button
         label="編輯"
         icon="pi pi-pencil"
         [routerLink]="['/courses', item.pkid, 'edit']" />
