@@ -1,0 +1,74 @@
+@if (loading()) {
+  <div class="state">載入中…</div>
+} @else if (notFound()) {
+  <div class="state">
+    <p>找不到這個課程。</p>
+    <p-button label="回到清單" icon="pi pi-arrow-left" routerLink="/courses" />
+  </div>
+} @else if (view(); as data) {
+  <!-- Screen-only. Buttons are stripped from print by the global @media print block. -->
+  <div class="toolbar no-print">
+    <p-button
+      label="返回課程"
+      icon="pi pi-arrow-left"
+      severity="secondary"
+      [outlined]="true"
+      [routerLink]="['/courses', data.course.pkid]" />
+    <p-button label="列印／另存 PDF" icon="pi pi-print" (onClick)="print()" />
+  </div>
+
+  <article class="sheet">
+    <header class="sheet-header">
+      <span class="company">{{ companyName }}</span>
+      <span class="doc-kind">課程資訊</span>
+    </header>
+
+    <h1 class="course-title">{{ data.course.title }}</h1>
+
+    @if (summaryRows().length) {
+      <dl class="rows">
+        @for (row of summaryRows(); track row.label) {
+          <dt>{{ row.label }}</dt>
+          <dd>{{ row.value }}</dd>
+        }
+      </dl>
+    }
+
+    @for (row of contentRows(); track row.label) {
+      <section class="block">
+        <h2>{{ row.label }}</h2>
+        <p class="pre">{{ row.value }}</p>
+      </section>
+    }
+
+    @if (data.certificationLabels.length) {
+      <section class="block">
+        <h2>相關認證</h2>
+        <div class="chips">
+          @for (label of data.certificationLabels; track label) {
+            <p-chip [label]="label" icon="pi pi-verified" />
+          }
+        </div>
+      </section>
+    }
+
+    @if (data.jobCategoryLabels.length) {
+      <section class="block">
+        <h2>適合職務</h2>
+        <div class="chips">
+          @for (label of data.jobCategoryLabels; track label) {
+            <p-chip [label]="label" icon="pi pi-briefcase" />
+          }
+        </div>
+      </section>
+    }
+
+    <footer class="sheet-footer">
+      <app-qr-code
+        [value]="qrUrl(data.course)"
+        [title]="data.course.courseId"
+        [fileName]="'QR_' + data.course.courseId" />
+      <p class="scan-hint">掃描 QR Code 查看線上課程頁</p>
+    </footer>
+  </article>
+}
