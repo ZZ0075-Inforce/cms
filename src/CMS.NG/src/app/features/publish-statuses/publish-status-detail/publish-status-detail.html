@@ -1,0 +1,59 @@
+@if (loading()) {
+  <div class="state">載入中…</div>
+} @else if (notFound()) {
+  <div class="state">
+    <p>找不到這個上架狀態。</p>
+    <p-button label="回到清單" icon="pi pi-arrow-left" routerLink="/publish-statuses" />
+  </div>
+} @else if (status(); as item) {
+  <div class="page-header">
+    <div class="titles">
+      <h1>檢視上架狀態</h1>
+      <span class="subtitle">{{ item.description }}</span>
+    </div>
+
+    <div class="actions">
+      <app-row-audit-badge [tableName]="'PublishStatus'" [pkid]="item.pkid" />
+      <p-button
+        label="回到清單"
+        icon="pi pi-arrow-left"
+        severity="secondary"
+        [outlined]="true"
+        routerLink="/publish-statuses" />
+      <p-button
+        label="編輯"
+        icon="pi pi-pencil"
+        [routerLink]="['/publish-statuses', item.pkid, 'edit']" />
+      <p-button
+        label="刪除"
+        icon="pi pi-trash"
+        severity="danger"
+        [outlined]="true"
+        (onClick)="confirmDelete()" />
+    </div>
+  </div>
+
+  <section class="card">
+    <h2>上架狀態資料</h2>
+
+    <dl class="detail-grid">
+      <dt>主代碼</dt>
+      <dd>{{ item.pkid }}</dd>
+
+      <dt>狀態說明</dt>
+      <dd class="strong">{{ item.description }}</dd>
+
+      <dt>草稿</dt>
+      <dd>{{ item.isDraft ? '是' : '否' }}</dd>
+
+      <dt>已上架</dt>
+      <dd>{{ item.isPublished ? '是' : '否' }}</dd>
+
+      <dt>已下架</dt>
+      <dd>{{ item.isDiscontinued ? '是' : '否' }}</dd>
+
+      <dt>對應課程數</dt>
+      <dd>{{ item.courseCount }}</dd>
+    </dl>
+  </section>
+}

@@ -81,6 +81,37 @@ export const routes: Routes = [
       },
 
       {
+        path: 'publish-statuses',
+        loadComponent: () =>
+          import('@features/publish-statuses/publish-status-list/publish-status-list')
+            .then(m => m.PublishStatusList),
+        title: '上架狀態 PublishStatus'
+      },
+      // 'new' before ':id', per the convention. PublishStatus's pkid is numeric, so ':id' would not
+      // actually swallow the literal "new" — but the ordering is the house rule and costs nothing to keep.
+      {
+        path: 'publish-statuses/new',
+        loadComponent: () =>
+          import('@features/publish-statuses/publish-status-form/publish-status-form')
+            .then(m => m.PublishStatusForm),
+        title: '新增上架狀態'
+      },
+      {
+        path: 'publish-statuses/:id/edit',
+        loadComponent: () =>
+          import('@features/publish-statuses/publish-status-form/publish-status-form')
+            .then(m => m.PublishStatusForm),
+        title: '編輯上架狀態'
+      },
+      {
+        path: 'publish-statuses/:id',
+        loadComponent: () =>
+          import('@features/publish-statuses/publish-status-detail/publish-status-detail')
+            .then(m => m.PublishStatusDetail),
+        title: '檢視上架狀態'
+      },
+
+      {
         path: 'partners',
         loadComponent: () =>
           import('@features/partners/partner-list/partner-list').then(m => m.PartnerList),

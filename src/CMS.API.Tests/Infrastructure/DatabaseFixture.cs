@@ -88,6 +88,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
             DELETE FROM dbo.AppRole       WHERE RoleId      LIKE 'TEST\_%' ESCAPE '\';
             DELETE FROM dbo.AppUser       WHERE UserId      LIKE 'TEST\_%' ESCAPE '\';
             DELETE FROM dbo.Course        WHERE CourseId    LIKE 'TEST\_%' ESCAPE '\';
+            DELETE FROM dbo.PublishStatus WHERE Description LIKE 'TEST\_%' ESCAPE '\';
             DELETE FROM dbo.Certification WHERE Title       LIKE 'TEST\_%' ESCAPE '\';
             DELETE FROM dbo.JobCategory   WHERE Description  LIKE 'TEST\_%' ESCAPE '\';
             DELETE FROM dbo.Partner       WHERE Name         LIKE 'TEST\_%' ESCAPE '\';
@@ -100,8 +101,9 @@ public sealed class DatabaseFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// One existing PublishStatus pkid, for Course FK seeding. PublishStatus is a fixed enum table
-    /// (rows are not TEST-owned and are never mutated); the real CMS DB always has rows.
+    /// One existing PublishStatus pkid, read-only, for Course / Promotion2 FK seeding. Callers borrow a
+    /// production pkid and never mutate it — distinct from the TEST_-owned rows the PublishStatus CRUD
+    /// tests create via <see cref="NextPublishStatusPkidAsync"/>.
     /// </summary>
     public async Task<byte> AnyPublishStatusPkidAsync()
     {
@@ -109,6 +111,20 @@ public sealed class DatabaseFixture : IAsyncLifetime
         await conn.OpenAsync();
         return await conn.ExecuteScalarAsync<byte>(
             "SELECT TOP 1 pkid FROM dbo.PublishStatus ORDER BY pkid;");
+    }
+
+    /// <summary>
+    /// An unused PublishStatus pkid (tinyint) for a TEST-owned row. pkid is a client-supplied key, NOT
+    /// an IDENTITY, so the test must pick one — MAX+1 stays well within tinyint range for this tiny enum
+    /// table. The row is swept by the TEST_ predicate on Description. This is the one place PublishStatus
+    /// becomes TEST-owned; production rows (草稿 / 已上架 / …) are never touched.
+    /// </summary>
+    public async Task<byte> NextPublishStatusPkidAsync()
+    {
+        await using var conn = new SqlConnection(_connectionString);
+        await conn.OpenAsync();
+        return await conn.ExecuteScalarAsync<byte>(
+            "SELECT CAST(ISNULL(MAX(pkid), 0) + 1 AS tinyint) FROM dbo.PublishStatus;");
     }
 
     /// <summary>
@@ -153,6 +169,9 @@ public sealed class DatabaseFixture : IAsyncLifetime
 
     /// <summary>A collision-proof, unique Promotion2.PromoCode — the column cleanup keys on. nvarchar(30).</summary>
     public static string NewPromoCode() => $"{Prefix}{Guid.NewGuid():N}"[..24];
+
+    /// <summary>A collision-proof PublishStatus.Description — the column cleanup keys on. nvarchar(50).</summary>
+    public static string NewPublishStatusDescription() => $"{Prefix}{Guid.NewGuid():N}"[..24];
 }
 
 [CollectionDefinition(DatabaseCollection.Name)]
