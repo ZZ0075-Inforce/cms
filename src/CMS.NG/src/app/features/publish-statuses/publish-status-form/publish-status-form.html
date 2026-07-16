@@ -1,0 +1,70 @@
+<form [formGroup]="form" (ngSubmit)="save()">
+  <div class="page-header">
+    <h1>{{ isEdit() ? '編輯上架狀態' : '新增上架狀態' }}</h1>
+
+    <div class="actions">
+      @if (auditPkid(); as pk) {
+        <app-row-audit-badge [tableName]="'PublishStatus'" [pkid]="pk" />
+      }
+      <p-button
+        label="取消"
+        icon="pi pi-times"
+        severity="secondary"
+        [outlined]="true"
+        type="button"
+        (onClick)="cancel()" />
+      <p-button
+        label="儲存"
+        icon="pi pi-check"
+        severity="success"
+        type="submit"
+        [loading]="saving()"
+        [disabled]="loading()" />
+    </div>
+  </div>
+
+  @if (!loading()) {
+    <section class="card">
+      <h2>上架狀態資料</h2>
+
+      <div class="field">
+        <label for="pkid">主代碼 <span class="required-mark">*</span></label>
+        <p-inputnumber
+          inputId="pkid"
+          formControlName="pkid"
+          [min]="0"
+          [max]="255"
+          [useGrouping]="false" />
+        @if (isEdit()) {
+          <small class="hint">主代碼為主鍵，建立後不可修改。</small>
+        }
+        @if (invalid('pkid')) {
+          <div class="field-error">主代碼為必填，且須介於 0 到 255。</div>
+        }
+      </div>
+
+      <div class="field">
+        <label for="description">狀態說明 <span class="required-mark">*</span></label>
+        <input pInputText id="description" type="text" formControlName="description" maxlength="50" />
+        @if (invalid('description')) {
+          <div class="field-error">狀態說明為必填，且長度不可超過 50 字。</div>
+        }
+      </div>
+
+      <div class="field">
+        <label for="isDraft">草稿</label>
+        <p-toggleswitch inputId="isDraft" formControlName="isDraft" />
+      </div>
+
+      <div class="field">
+        <label for="isPublished">已上架</label>
+        <p-toggleswitch inputId="isPublished" formControlName="isPublished" />
+      </div>
+
+      <div class="field">
+        <label for="isDiscontinued">已下架</label>
+        <p-toggleswitch inputId="isDiscontinued" formControlName="isDiscontinued" />
+      </div>
+    </section>
+  }
+</form>
