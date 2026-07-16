@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { RowAuditService } from '@core/services/row-audit.service';
 import { MessageService } from 'primeng/api';
 import { of } from 'rxjs';
 
@@ -28,6 +29,7 @@ describe('CourseGroupForm', () => {
       imports: [CourseGroupForm],
       providers: [
         provideNoopAnimations(),
+        { provide: RowAuditService, useValue: { history: () => of([]) } },
         { provide: CourseGroupService, useValue: service },
         MessageService,
         {

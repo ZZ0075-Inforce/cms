@@ -16,6 +16,7 @@ import { AppRoleService } from '@core/services/app-role.service';
 import { LookupService } from '@core/services/lookup.service';
 import { AppRole, AppRoleRequest } from '@core/models/app-role.model';
 import { AppUserLookup, appUserLabel } from '@core/models/app-user.model';
+import { RowAuditBadge } from '@shared/row-audit-badge/row-audit-badge';
 
 /** Mirrors the API's [RegularExpression] on RoleId — the key must stay URL-path safe. */
 const ROLE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
@@ -33,7 +34,8 @@ interface UserOption {
     InputTextModule,
     InputNumberModule,
     MultiSelectModule,
-    CardModule
+    CardModule,
+    RowAuditBadge
   ],
   templateUrl: './app-role-form.html',
   styleUrl: './app-role-form.scss'
@@ -50,6 +52,8 @@ export class AppRoleForm implements OnInit {
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
   protected readonly userOptions = signal<UserOption[]>([]);
+  /** The record's numeric pkid in edit mode (audit is keyed on pkid, not RoleId); null on create. */
+  protected readonly auditPkid = signal<number | null>(null);
 
   protected readonly form = this.fb.nonNullable.group({
     roleId: ['', [Validators.required, Validators.maxLength(200), Validators.pattern(ROLE_ID_PATTERN)]],
@@ -91,6 +95,7 @@ export class AppRoleForm implements OnInit {
   }
 
   private patchFromRole(role: AppRole): void {
+    this.auditPkid.set(role.pkid);
     this.form.patchValue({
       roleId: role.roleId,
       roleName: role.roleName,

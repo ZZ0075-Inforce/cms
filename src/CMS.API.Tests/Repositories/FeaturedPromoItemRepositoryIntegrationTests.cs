@@ -20,7 +20,7 @@ namespace CMS.API.Tests.Repositories;
 [Collection(DatabaseCollection.Name)]
 public class FeaturedPromoItemRepositoryIntegrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
-    private readonly FeaturedPromoItemRepository _repository = new(fixture.ConnectionFactory);
+    private readonly FeaturedPromoItemRepository _repository = new(fixture.ConnectionFactory, fixture.AuditWriter);
     private readonly LookupRepository _lookups = new(fixture.ConnectionFactory);
     private readonly List<int> _created = [];
 

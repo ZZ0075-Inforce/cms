@@ -41,6 +41,9 @@
   </div>
 
   <div class="actions">
+    @if (context().pkid > 0) {
+      <app-row-audit-badge [tableName]="'FeaturedPromoItem'" [pkid]="context().pkid" />
+    }
     <p-button type="submit" label="Save" [text]="true" size="small" />
     <p-button type="button" label="Cancel" [text]="true" severity="secondary" size="small" (onClick)="onCancel()" />
   </div>

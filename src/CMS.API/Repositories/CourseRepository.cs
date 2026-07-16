@@ -6,8 +6,10 @@ using Dapper;
 
 namespace CMS.API.Repositories;
 
-public sealed class CourseRepository(IDbConnectionFactory connectionFactory) : ICourseRepository
+public sealed class CourseRepository(IDbConnectionFactory connectionFactory, IRowAuditWriter auditWriter)
+    : ICourseRepository
 {
+    private const string AuditTable = "Course";
     // Three FKs resolved to flat display labels: INNER JOIN Partner/PublishStatus (both NOT NULL),
     // LEFT JOIN CourseGroup (nullable → CourseGroupName comes back null when no group).
     private const string SelectColumns = """
@@ -134,6 +136,9 @@ public sealed class CourseRepository(IDbConnectionFactory connectionFactory) : I
         await SyncJunctionAsync(conn, tx, "CourseJobCategories", "JobCategory_pkid",
             pkid, request.JobCategoryPkids, ct);
 
+        var inserted = await LoadForAuditAsync(conn, tx, pkid, ct);
+        await auditWriter.LogInsertAsync(conn, tx, AuditTable, inserted!, ct);
+
         await tx.CommitAsync(ct);
         return pkid;
     }
@@ -156,19 +161,25 @@ public sealed class CourseRepository(IDbConnectionFactory connectionFactory) : I
         await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
 
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
-            sql, Parameters(request, request.Pkid), tx, cancellationToken: ct));
-
-        if (affected == 0)
+        // Load the "before" first so the audit's changed-column list is accurate. A missing row is the
+        // 404 case (the old affected == 0 short-circuit).
+        var before = await LoadForAuditAsync(conn, tx, request.Pkid, ct);
+        if (before is null)
         {
             await tx.RollbackAsync(ct);
             return false;
         }
 
+        await conn.ExecuteAsync(new CommandDefinition(
+            sql, Parameters(request, request.Pkid), tx, cancellationToken: ct));
+
         await SyncJunctionAsync(conn, tx, "CourseInCertification", "Certification_pkid",
             request.Pkid, request.CertificationPkids, ct);
         await SyncJunctionAsync(conn, tx, "CourseJobCategories", "JobCategory_pkid",
             request.Pkid, request.JobCategoryPkids, ct);
+
+        var after = await LoadForAuditAsync(conn, tx, request.Pkid, ct);
+        await auditWriter.LogUpdateAsync(conn, tx, AuditTable, before, after!, ct);
 
         await tx.CommitAsync(ct);
         return true;
@@ -178,14 +189,47 @@ public sealed class CourseRepository(IDbConnectionFactory connectionFactory) : I
     {
         // CourseInCertification / CourseJobCategories cascade, so no need to pre-clean them. But
         // CourseFAQ / CourseRelatedLink / HotCourse do NOT cascade — a course still referenced there
-        // throws 547, left to propagate for the controller to turn into a 409.
+        // throws 547, left to propagate for the controller to turn into a 409; the transaction then
+        // rolls back, so a blocked delete leaves no audit row.
         const string sql = "DELETE FROM dbo.Course WHERE pkid = @Pkid;";
 
         await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
-            sql, new { Pkid = pkid }, cancellationToken: ct));
-        return affected > 0;
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        // Load before deleting so the audit can record the row's first string column (Title).
+        var row = await LoadForAuditAsync(conn, tx, pkid, ct);
+        if (row is null)
+        {
+            await tx.RollbackAsync(ct);
+            return false;
+        }
+
+        await conn.ExecuteAsync(new CommandDefinition(sql, new { Pkid = pkid }, tx, cancellationToken: ct));
+        await auditWriter.LogDeleteAsync(conn, tx, AuditTable, row, ct);
+
+        await tx.CommitAsync(ct);
+        return true;
     }
+
+    /// <summary>
+    /// Loads the row's own columns (no JOIN labels, no N-N sets) as the audit before/after snapshot, on
+    /// the caller's transaction so it sees the in-flight change. The excluded properties stay at their
+    /// defaults on both sides, so they never appear in the changed-column list.
+    /// </summary>
+    private static async Task<Course?> LoadForAuditAsync(
+        DbConnection conn, DbTransaction tx, int pkid, CancellationToken ct)
+        => await conn.QuerySingleOrDefaultAsync<Course>(new CommandDefinition("""
+            SELECT c.pkid AS Pkid, c.Title, c.OfficialTitle, c.CourseId, c.ProdCourseId, c.FriendlyUrl,
+                   c.DisplayOrder,
+                   c.Partner_pkid       AS PartnerPkid,
+                   c.CourseGroup_pkid   AS CourseGroupPkid,
+                   c.PublishStatus_pkid AS PublishStatusPkid,
+                   c.ScheduleOn, c.ScheduleOff, c.Hour, c.ListPrice, c.LearningCredit,
+                   c.Material, c.Objective, c.Target, c.Prerequisites, c.Outline,
+                   c.TowardCertOrExam, c.Note, c.OtherInfo, c.CanRepeat
+            FROM   dbo.Course c
+            WHERE  c.pkid = @Pkid;
+            """, new { Pkid = pkid }, tx, cancellationToken: ct));
 
     /// <summary>
     /// N-N sync: delete-then-reinsert inside the caller's transaction. <paramref name="table"/> and

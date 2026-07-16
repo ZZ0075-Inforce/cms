@@ -14,7 +14,7 @@ namespace CMS.API.Tests.Repositories;
 [Collection(DatabaseCollection.Name)]
 public class CourseGroupRepositoryIntegrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
-    private readonly CourseGroupRepository _repository = new(fixture.ConnectionFactory);
+    private readonly CourseGroupRepository _repository = new(fixture.ConnectionFactory, fixture.AuditWriter);
     private readonly List<short> _created = [];
 
     public Task InitializeAsync() => Task.CompletedTask;

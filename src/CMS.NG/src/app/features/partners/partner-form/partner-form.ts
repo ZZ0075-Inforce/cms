@@ -11,10 +11,11 @@ import { InputNumberModule } from 'primeng/inputnumber';
 
 import { PartnerService } from '@core/services/partner.service';
 import { Partner, PartnerRequest } from '@core/models/partner.model';
+import { RowAuditBadge } from '@shared/row-audit-badge/row-audit-badge';
 
 @Component({
   selector: 'app-partner-form',
-  imports: [ReactiveFormsModule, ButtonModule, InputTextModule, InputNumberModule],
+  imports: [ReactiveFormsModule, ButtonModule, InputTextModule, InputNumberModule, RowAuditBadge],
   templateUrl: './partner-form.html',
   styleUrl: './partner-form.scss'
 })
@@ -28,6 +29,8 @@ export class PartnerForm implements OnInit {
   protected readonly isEdit = signal(false);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
+  /** The record's pkid in edit mode; null on create (no history yet, so no badge). */
+  protected readonly auditPkid = signal<number | null>(null);
 
   protected readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(50)]],
@@ -71,6 +74,7 @@ export class PartnerForm implements OnInit {
 
   private patchFromPartner(partner: Partner): void {
     this.pkid = partner.pkid;
+    this.auditPkid.set(partner.pkid);
     this.form.patchValue({
       name: partner.name,
       appKey: partner.appKey,

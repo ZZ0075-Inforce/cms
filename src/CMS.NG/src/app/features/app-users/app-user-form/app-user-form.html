@@ -3,6 +3,9 @@
     <h1>{{ isEdit() ? '編輯使用者' : '新增使用者' }}</h1>
 
     <div class="actions">
+      @if (auditPkid(); as pk) {
+        <app-row-audit-badge [tableName]="'AppUser'" [pkid]="pk" />
+      }
       <p-button
         label="取消"
         icon="pi pi-times"

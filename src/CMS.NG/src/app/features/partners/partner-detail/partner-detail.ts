@@ -7,10 +7,11 @@ import { ButtonModule } from 'primeng/button';
 
 import { PartnerService } from '@core/services/partner.service';
 import { Partner } from '@core/models/partner.model';
+import { RowAuditBadge } from '@shared/row-audit-badge/row-audit-badge';
 
 @Component({
   selector: 'app-partner-detail',
-  imports: [RouterLink, ButtonModule],
+  imports: [RouterLink, ButtonModule, RowAuditBadge],
   templateUrl: './partner-detail.html',
   styleUrl: './partner-detail.scss'
 })

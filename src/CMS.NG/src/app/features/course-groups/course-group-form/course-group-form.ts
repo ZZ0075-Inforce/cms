@@ -10,10 +10,11 @@ import { InputTextModule } from 'primeng/inputtext';
 
 import { CourseGroupService } from '@core/services/course-group.service';
 import { CourseGroup, CourseGroupRequest } from '@core/models/course-group.model';
+import { RowAuditBadge } from '@shared/row-audit-badge/row-audit-badge';
 
 @Component({
   selector: 'app-course-group-form',
-  imports: [ReactiveFormsModule, ButtonModule, InputTextModule],
+  imports: [ReactiveFormsModule, ButtonModule, InputTextModule, RowAuditBadge],
   templateUrl: './course-group-form.html',
   styleUrl: './course-group-form.scss'
 })
@@ -27,6 +28,8 @@ export class CourseGroupForm implements OnInit {
   protected readonly isEdit = signal(false);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
+  /** The record's pkid in edit mode; null on create (no history yet, so no badge). */
+  protected readonly auditPkid = signal<number | null>(null);
 
   protected readonly form = this.fb.nonNullable.group({
     description: ['', [Validators.required, Validators.maxLength(100)]]
@@ -63,6 +66,7 @@ export class CourseGroupForm implements OnInit {
 
   private patchFromGroup(group: CourseGroup): void {
     this.pkid = group.pkid;
+    this.auditPkid.set(group.pkid);
     this.form.patchValue({ description: group.description });
   }
 

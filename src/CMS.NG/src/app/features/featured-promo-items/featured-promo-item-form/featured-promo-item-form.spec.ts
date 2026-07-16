@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { RowAuditService } from '@core/services/row-audit.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 
@@ -39,7 +40,11 @@ describe('FeaturedPromoItemForm', () => {
 
     await TestBed.configureTestingModule({
       imports: [FeaturedPromoItemForm],
-      providers: [provideNoopAnimations(), { provide: LookupService, useValue: lookups }]
+      providers: [
+        provideNoopAnimations(),
+        { provide: LookupService, useValue: lookups },
+        { provide: RowAuditService, useValue: { history: () => of([]) } }
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(FeaturedPromoItemForm);

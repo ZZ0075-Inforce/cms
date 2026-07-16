@@ -3,6 +3,9 @@
     <h1>{{ isEdit() ? '編輯課程' : '新增課程' }}</h1>
 
     <div class="actions">
+      @if (auditPkid(); as pk) {
+        <app-row-audit-badge [tableName]="'Course'" [pkid]="pk" />
+      }
       <p-button
         label="取消"
         icon="pi pi-times"

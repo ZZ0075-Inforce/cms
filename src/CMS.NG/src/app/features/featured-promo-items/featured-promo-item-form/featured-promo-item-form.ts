@@ -7,6 +7,7 @@ import { InputTextModule } from 'primeng/inputtext';
 
 import { LookupService } from '@core/services/lookup.service';
 import { FeaturedPromoItemRequest } from '@core/models/featured-promo-item.model';
+import { RowAuditBadge } from '@shared/row-audit-badge/row-audit-badge';
 
 /** Where the edited row lives — carried through unchanged into the emitted request. */
 export interface FeaturedPromoItemFormContext {
@@ -37,7 +38,7 @@ export interface FeaturedPromoItemFormInitial {
  */
 @Component({
   selector: 'app-featured-promo-item-form',
-  imports: [ReactiveFormsModule, ButtonModule, InputTextModule],
+  imports: [ReactiveFormsModule, ButtonModule, InputTextModule, RowAuditBadge],
   templateUrl: './featured-promo-item-form.html',
   styleUrl: './featured-promo-item-form.scss'
 })

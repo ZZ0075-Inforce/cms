@@ -3,6 +3,9 @@
     <h1>{{ isEdit() ? '編輯角色' : '新增角色' }}</h1>
 
     <div class="actions">
+      @if (auditPkid(); as pk) {
+        <app-row-audit-badge [tableName]="'AppRole'" [pkid]="pk" />
+      }
       <p-button
         label="取消"
         icon="pi pi-times"

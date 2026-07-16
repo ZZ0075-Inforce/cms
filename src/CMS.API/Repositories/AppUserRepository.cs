@@ -7,8 +7,11 @@ using Dapper;
 
 namespace CMS.API.Repositories;
 
-public sealed class AppUserRepository(IDbConnectionFactory connectionFactory) : IAppUserRepository
+public sealed class AppUserRepository(IDbConnectionFactory connectionFactory, IRowAuditWriter auditWriter)
+    : IAppUserRepository
 {
+    private const string AuditTable = "AppUser";
+
     // 角色數 — AppUserRole joins on the string key UserId, not pkid.
     // PasswordHash is intentionally never SELECTed: it is backend-only and must not reach the model.
     private const string SelectColumns = """
@@ -114,6 +117,9 @@ public sealed class AppUserRepository(IDbConnectionFactory connectionFactory) : 
 
         await SyncUserRolesAsync(conn, tx, request.UserId, request.RoleIds, ct);
 
+        var inserted = await LoadForAuditAsync(conn, tx, request.UserId, ct);
+        await auditWriter.LogInsertAsync(conn, tx, AuditTable, inserted!, ct);
+
         await tx.CommitAsync(ct);
         return pkid;
     }
@@ -133,18 +139,24 @@ public sealed class AppUserRepository(IDbConnectionFactory connectionFactory) : 
         await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
 
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
-            sql,
-            new { request.UserId, request.UserName, request.IsActive },
-            tx, cancellationToken: ct));
-
-        if (affected == 0)
+        // Load the "before" first so the audit's changed-column list is accurate; a missing user is the
+        // 404 case (the old affected == 0 short-circuit).
+        var before = await LoadForAuditAsync(conn, tx, request.UserId, ct);
+        if (before is null)
         {
             await tx.RollbackAsync(ct);
             return false;
         }
 
+        await conn.ExecuteAsync(new CommandDefinition(
+            sql,
+            new { request.UserId, request.UserName, request.IsActive },
+            tx, cancellationToken: ct));
+
         await SyncUserRolesAsync(conn, tx, request.UserId, request.RoleIds, ct);
+
+        var after = await LoadForAuditAsync(conn, tx, request.UserId, ct);
+        await auditWriter.LogUpdateAsync(conn, tx, AuditTable, before, after!, ct);
 
         await tx.CommitAsync(ct);
         return true;
@@ -159,17 +171,22 @@ public sealed class AppUserRepository(IDbConnectionFactory connectionFactory) : 
         await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
 
-        await conn.ExecuteAsync(new CommandDefinition(
-            deleteUserRoles, new { UserId = userId }, tx, cancellationToken: ct));
-
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
-            deleteUser, new { UserId = userId }, tx, cancellationToken: ct));
-
-        if (affected == 0)
+        // Load before deleting so the audit can record the row's first string column (UserId); a
+        // missing user is the 404 case.
+        var user = await LoadForAuditAsync(conn, tx, userId, ct);
+        if (user is null)
         {
             await tx.RollbackAsync(ct);
             return false;
         }
+
+        await conn.ExecuteAsync(new CommandDefinition(
+            deleteUserRoles, new { UserId = userId }, tx, cancellationToken: ct));
+
+        await conn.ExecuteAsync(new CommandDefinition(
+            deleteUser, new { UserId = userId }, tx, cancellationToken: ct));
+
+        await auditWriter.LogDeleteAsync(conn, tx, AuditTable, user, ct);
 
         await tx.CommitAsync(ct);
         return true;
@@ -193,6 +210,19 @@ public sealed class AppUserRepository(IDbConnectionFactory connectionFactory) : 
 
         return affected > 0;
     }
+
+    /// <summary>
+    /// Loads the user's own columns (no derived RoleCount, no RoleIds set, and never PasswordHash) as
+    /// the audit before/after snapshot, keyed on the string UserId and on the caller's transaction so it
+    /// sees the in-flight change. Pkid is SELECTed for PrimaryKeyValues even though it is not the key.
+    /// </summary>
+    private static async Task<AppUser?> LoadForAuditAsync(
+        DbConnection conn, DbTransaction tx, string userId, CancellationToken ct)
+        => await conn.QuerySingleOrDefaultAsync<AppUser>(new CommandDefinition("""
+            SELECT pkid AS Pkid, UserId, UserName, IsActive, PasswordUpdatedTime
+            FROM   dbo.AppUser
+            WHERE  UserId = @UserId;
+            """, new { UserId = userId }, tx, cancellationToken: ct));
 
     /// <summary>N-N sync: delete-then-reinsert, inside the caller's transaction.</summary>
     private static async Task SyncUserRolesAsync(

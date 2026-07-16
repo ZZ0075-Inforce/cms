@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { RowAuditService } from '@core/services/row-audit.service';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { of, throwError } from 'rxjs';
 
@@ -51,6 +52,7 @@ describe('AppUserForm', () => {
       imports: [AppUserForm],
       providers: [
         provideNoopAnimations(),
+        { provide: RowAuditService, useValue: { history: () => of([]) } },
         { provide: AppUserService, useValue: userService },
         { provide: LookupService, useValue: lookupService },
         { provide: MessageService, useValue: messageService },

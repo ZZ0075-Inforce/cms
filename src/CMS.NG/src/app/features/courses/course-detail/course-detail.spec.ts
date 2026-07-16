@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { RowAuditService } from '@core/services/row-audit.service';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { of, throwError } from 'rxjs';
 
@@ -42,6 +43,7 @@ describe('CourseDetail', () => {
       imports: [CourseDetail],
       providers: [
         provideNoopAnimations(),
+        { provide: RowAuditService, useValue: { history: () => of([]) } },
         provideRouter([]),
         { provide: CourseService, useValue: service },
         { provide: LookupService, useValue: lookups },

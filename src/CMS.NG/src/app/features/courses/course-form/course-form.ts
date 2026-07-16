@@ -20,6 +20,7 @@ import { CourseService } from '@core/services/course.service';
 import { LookupService } from '@core/services/lookup.service';
 import { Course, CourseRequest } from '@core/models/course.model';
 import { toIso, fromIso, addYears } from '@core/utils/date.util';
+import { RowAuditBadge } from '@shared/row-audit-badge/row-audit-badge';
 
 interface Option { pkid: number; label: string; }
 
@@ -27,7 +28,8 @@ interface Option { pkid: number; label: string; }
   selector: 'app-course-form',
   imports: [
     ReactiveFormsModule, ButtonModule, InputTextModule, InputNumberModule, SelectModule,
-    MultiSelectModule, DatePickerModule, TextareaModule, ToggleSwitchModule, CardModule
+    MultiSelectModule, DatePickerModule, TextareaModule, ToggleSwitchModule, CardModule,
+    RowAuditBadge
   ],
   templateUrl: './course-form.html',
   styleUrl: './course-form.scss'
@@ -43,6 +45,8 @@ export class CourseForm implements OnInit {
   protected readonly isEdit = signal(false);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
+  /** The record's pkid in edit mode; null on create (no history yet, so no badge). */
+  protected readonly auditPkid = signal<number | null>(null);
 
   protected readonly partnerOptions = signal<Option[]>([]);
   protected readonly courseGroupOptions = signal<Option[]>([]);
@@ -124,6 +128,7 @@ export class CourseForm implements OnInit {
 
   private patchFromCourse(course: Course): void {
     this.pkid = course.pkid;
+    this.auditPkid.set(course.pkid);
     // scheduleOn before scheduleOff so the auto-default fires first, then the loaded value wins.
     this.form.patchValue({
       title: course.title,

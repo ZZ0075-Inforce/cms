@@ -1,0 +1,61 @@
+<button
+  type="button"
+  class="audit-badge"
+  [class.audit-badge--empty]="!loading() && !hasHistory()"
+  (click)="open()"
+  [attr.aria-label]="'異動紀錄 History'">
+  <i class="pi pi-history"></i>
+  <span class="audit-badge__text">
+    <span class="audit-badge__label">異動紀錄 History</span>
+    @if (loading()) {
+      <span class="audit-badge__sub">載入中…</span>
+    } @else if (loadError()) {
+      <span class="audit-badge__sub audit-badge__sub--muted">無法載入異動紀錄</span>
+    } @else if (latest(); as l) {
+      <span class="audit-badge__sub">
+        {{ l.actionType }} by {{ l.userName }} · {{ l.dateTime | date:'yyyy-MM-dd HH:mm' }}
+      </span>
+    } @else {
+      <span class="audit-badge__sub audit-badge__sub--muted">尚無異動 No history</span>
+    }
+  </span>
+</button>
+
+<p-dialog
+  [visible]="dialogVisible()"
+  (visibleChange)="dialogVisible.set($event)"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  [dismissableMask]="true"
+  header="異動紀錄 History"
+  [style]="{ width: '42rem', maxWidth: '95vw' }">
+  @if (loading()) {
+    <p class="audit-trail__state">載入中…</p>
+  } @else if (loadError()) {
+    <p class="audit-trail__state">無法載入異動紀錄，請稍後再試。</p>
+  } @else if (hasHistory()) {
+    <ol class="audit-trail">
+      @for (entry of entries(); track $index) {
+        <li class="audit-trail__item">
+          <div class="audit-trail__head">
+            <span
+              class="audit-trail__action"
+              [class.audit-trail__action--insert]="entry.actionType === 'Insert'"
+              [class.audit-trail__action--update]="entry.actionType === 'Update'"
+              [class.audit-trail__action--delete]="entry.actionType === 'Delete'">
+              {{ entry.actionType }}
+            </span>
+            <span class="audit-trail__user"><i class="pi pi-user"></i> {{ entry.userName }}</span>
+            <span class="audit-trail__time">{{ entry.dateTime | date:'yyyy-MM-dd HH:mm:ss' }}</span>
+          </div>
+          @if (entry.actionDesc) {
+            <div class="audit-trail__desc">{{ entry.actionDesc }}</div>
+          }
+        </li>
+      }
+    </ol>
+  } @else {
+    <p class="audit-trail__state audit-trail__state--empty">尚無異動紀錄 No history yet</p>
+  }
+</p-dialog>

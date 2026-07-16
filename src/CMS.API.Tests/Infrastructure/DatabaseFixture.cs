@@ -1,6 +1,8 @@
 using System.Data.Common;
 using CMS.API.Data;
+using CMS.API.Infrastructure;
 using Dapper;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 
@@ -25,6 +27,13 @@ public sealed class DatabaseFixture : IAsyncLifetime
     public static readonly string[] TestUserIds = [$"{Prefix}user_a", $"{Prefix}user_b"];
 
     public IDbConnectionFactory ConnectionFactory { get; }
+
+    /// <summary>
+    /// A real audit writer for the retrofitted repositories to call. Its HttpContextAccessor has no
+    /// request in scope, so every audit row it writes is attributed to "system" — matching how a
+    /// background/integration run has no signed-in user.
+    /// </summary>
+    public IRowAuditWriter AuditWriter { get; } = new RowAuditWriter(new HttpContextAccessor());
 
     private readonly string _connectionString = TestConnectionString.Value;
 

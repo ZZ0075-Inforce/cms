@@ -21,6 +21,12 @@ builder.Services.AddScoped<ICourseGroupRepository, CourseGroupRepository>();
 builder.Services.AddScoped<ICourseRepository, CourseRepository>();
 builder.Services.AddScoped<IFeaturedPromoItemRepository, FeaturedPromoItemRepository>();
 builder.Services.AddScoped<ILookupRepository, LookupRepository>();
+builder.Services.AddScoped<IRowAuditRepository, RowAuditRepository>();
+
+// Cross-cutting audit writer. Reads the current user from the request (HttpContext), so the accessor
+// must be registered too; repositories call it inside their own transaction after a change succeeds.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IRowAuditWriter, RowAuditWriter>();
 
 // JWT bearer auth. The signing key lives in SysConfig (read lazily via ISigningKeyProvider), so the
 // options are configured through ConfigureJwtBearerOptions rather than an inline static key.
@@ -65,6 +71,10 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Outermost middleware: catch any exception escaping the pipeline below and return one safe 500.
+// It never clears the response, so CORS headers an inner middleware added are preserved.
+app.UseMiddleware<GlobalExceptionMiddleware>();
 
 app.UseSwagger();
 app.UseSwaggerUI();

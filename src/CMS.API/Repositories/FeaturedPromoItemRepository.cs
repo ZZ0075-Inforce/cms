@@ -1,12 +1,16 @@
+using System.Data.Common;
 using CMS.API.Data;
+using CMS.API.Infrastructure;
 using CMS.API.Models;
 using Dapper;
 
 namespace CMS.API.Repositories;
 
-public sealed class FeaturedPromoItemRepository(IDbConnectionFactory connectionFactory)
+public sealed class FeaturedPromoItemRepository(
+    IDbConnectionFactory connectionFactory, IRowAuditWriter auditWriter)
     : IFeaturedPromoItemRepository
 {
+    private const string AuditTable = "FeaturedPromoItem";
     /// <summary>The mockup lays out three slots per day; a move must stay inside this range.</summary>
     private const int MinSlot = 1;
     private const int MaxSlot = 3;
@@ -83,7 +87,8 @@ public sealed class FeaturedPromoItemRepository(IDbConnectionFactory connectionF
     {
         // A bad Promotion/TrainingCenter pkid trips FK 547; a duplicate (ScheduleOn, TrainingCenter,
         // Slot) trips the UNIQUE index (2627/2601). Both are left to propagate for the controller to
-        // translate (400 and 409 respectively).
+        // translate (400 and 409 respectively) — the transaction then rolls back, so a rejected insert
+        // leaves no audit row.
         const string sql = """
             INSERT INTO dbo.FeaturedPromoItem
                 (ScheduleOn, TrainingCenter_pkid, Slot, Promotion_pkid, Topic, Description)
@@ -93,8 +98,16 @@ public sealed class FeaturedPromoItemRepository(IDbConnectionFactory connectionF
             """;
 
         await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
-        return await conn.ExecuteScalarAsync<int>(
-            new CommandDefinition(sql, Parameters(request), cancellationToken: ct));
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        var pkid = await conn.ExecuteScalarAsync<int>(
+            new CommandDefinition(sql, Parameters(request), tx, cancellationToken: ct));
+
+        var inserted = await LoadForAuditAsync(conn, tx, pkid, ct);
+        await auditWriter.LogInsertAsync(conn, tx, AuditTable, inserted!, ct);
+
+        await tx.CommitAsync(ct);
+        return pkid;
     }
 
     public async Task<bool> UpdateAsync(FeaturedPromoItemRequest request, CancellationToken ct = default)
@@ -107,9 +120,24 @@ public sealed class FeaturedPromoItemRepository(IDbConnectionFactory connectionF
             """;
 
         await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
-        var affected = await conn.ExecuteAsync(
-            new CommandDefinition(sql, Parameters(request, request.Pkid), cancellationToken: ct));
-        return affected > 0;
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        // Load the "before" first so the audit's changed-column list is accurate; a missing row is 404.
+        var before = await LoadForAuditAsync(conn, tx, request.Pkid, ct);
+        if (before is null)
+        {
+            await tx.RollbackAsync(ct);
+            return false;
+        }
+
+        await conn.ExecuteAsync(
+            new CommandDefinition(sql, Parameters(request, request.Pkid), tx, cancellationToken: ct));
+
+        var after = await LoadForAuditAsync(conn, tx, request.Pkid, ct);
+        await auditWriter.LogUpdateAsync(conn, tx, AuditTable, before, after!, ct);
+
+        await tx.CommitAsync(ct);
+        return true;
     }
 
     public async Task<bool> DeleteAsync(int pkid, CancellationToken ct = default)
@@ -117,10 +145,35 @@ public sealed class FeaturedPromoItemRepository(IDbConnectionFactory connectionF
         const string sql = "DELETE FROM dbo.FeaturedPromoItem WHERE pkid = @Pkid;";
 
         await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
-        var affected = await conn.ExecuteAsync(
-            new CommandDefinition(sql, new { Pkid = pkid }, cancellationToken: ct));
-        return affected > 0;
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        // Load before deleting so the audit can record the row's first string column (Topic).
+        var row = await LoadForAuditAsync(conn, tx, pkid, ct);
+        if (row is null)
+        {
+            await tx.RollbackAsync(ct);
+            return false;
+        }
+
+        await conn.ExecuteAsync(new CommandDefinition(sql, new { Pkid = pkid }, tx, cancellationToken: ct));
+        await auditWriter.LogDeleteAsync(conn, tx, AuditTable, row, ct);
+
+        await tx.CommitAsync(ct);
+        return true;
     }
+
+    /// <summary>
+    /// Loads the row's own columns (no derived JOIN labels) as the audit before/after snapshot, on the
+    /// caller's transaction so it sees the in-flight change.
+    /// </summary>
+    private static async Task<FeaturedPromoItem?> LoadForAuditAsync(
+        DbConnection conn, DbTransaction tx, int pkid, CancellationToken ct)
+        => await conn.QuerySingleOrDefaultAsync<FeaturedPromoItem>(new CommandDefinition("""
+            SELECT pkid AS Pkid, ScheduleOn, TrainingCenter_pkid AS TrainingCenterPkid, Slot,
+                   Promotion_pkid AS PromotionPkid, Topic, Description
+            FROM   dbo.FeaturedPromoItem
+            WHERE  pkid = @Pkid;
+            """, new { Pkid = pkid }, tx, cancellationToken: ct));
 
     public async Task<SlotMoveResult> MoveSlotAsync(int pkid, int delta, CancellationToken ct = default)
     {

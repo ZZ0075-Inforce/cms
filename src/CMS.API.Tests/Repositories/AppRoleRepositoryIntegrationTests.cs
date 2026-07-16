@@ -17,7 +17,7 @@ namespace CMS.API.Tests.Repositories;
 [Collection(DatabaseCollection.Name)]
 public class AppRoleRepositoryIntegrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
-    private readonly AppRoleRepository _repository = new(fixture.ConnectionFactory);
+    private readonly AppRoleRepository _repository = new(fixture.ConnectionFactory, fixture.AuditWriter);
     private readonly List<string> _created = [];
 
     private static string UserA => DatabaseFixture.TestUserIds[0];

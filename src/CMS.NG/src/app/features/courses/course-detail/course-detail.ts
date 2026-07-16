@@ -13,10 +13,11 @@ import { CourseService } from '@core/services/course.service';
 import { LookupService } from '@core/services/lookup.service';
 import { Course, CertificationLookup, JobCategoryLookup } from '@core/models/course.model';
 import { QrCode } from '@shared/qr-code/qr-code';
+import { RowAuditBadge } from '@shared/row-audit-badge/row-audit-badge';
 
 @Component({
   selector: 'app-course-detail',
-  imports: [DatePipe, RouterLink, ButtonModule, ChipModule, QrCode],
+  imports: [DatePipe, RouterLink, ButtonModule, ChipModule, QrCode, RowAuditBadge],
   templateUrl: './course-detail.html',
   styleUrl: './course-detail.scss'
 })

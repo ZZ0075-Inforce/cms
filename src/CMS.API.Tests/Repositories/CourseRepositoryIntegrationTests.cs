@@ -19,8 +19,8 @@ namespace CMS.API.Tests.Repositories;
 [Collection(DatabaseCollection.Name)]
 public class CourseRepositoryIntegrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
-    private readonly CourseRepository _repository = new(fixture.ConnectionFactory);
-    private readonly PartnerRepository _partners = new(fixture.ConnectionFactory);
+    private readonly CourseRepository _repository = new(fixture.ConnectionFactory, fixture.AuditWriter);
+    private readonly PartnerRepository _partners = new(fixture.ConnectionFactory, fixture.AuditWriter);
     private readonly List<int> _createdCourses = [];
 
     private short _partnerPkid;

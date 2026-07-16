@@ -1,3 +1,4 @@
+using System.Data.Common;
 using CMS.API.Data;
 using CMS.API.Infrastructure;
 using CMS.API.Models;
@@ -5,8 +6,10 @@ using Dapper;
 
 namespace CMS.API.Repositories;
 
-public sealed class CourseGroupRepository(IDbConnectionFactory connectionFactory) : ICourseGroupRepository
+public sealed class CourseGroupRepository(IDbConnectionFactory connectionFactory, IRowAuditWriter auditWriter)
+    : ICourseGroupRepository
 {
+    private const string AuditTable = "CourseGroup";
     // No JOIN: CourseGroup has no foreign keys. CourseCount is 對應課程數, for display in the list
     // and to size the delete-confirm warning (FK_Course_CourseGroup cascades).
     private const string SelectColumns = """
@@ -61,8 +64,9 @@ public sealed class CourseGroupRepository(IDbConnectionFactory connectionFactory
 
     public async Task<short> InsertAsync(CourseGroupRequest request, CancellationToken ct = default)
     {
-        // No transaction: CourseGroup has no junction rows to keep in step, so this is a single
-        // statement. SCOPE_IDENTITY() returns numeric(38,0), hence the CAST to the pkid's own type.
+        // A transaction (which the plain CRUD path would not otherwise need) makes the RowAudit row
+        // commit or roll back atomically with the insert. SCOPE_IDENTITY() returns numeric(38,0),
+        // hence the CAST to the pkid's own type.
         const string sql = """
             INSERT INTO dbo.CourseGroup (Description)
             VALUES (@Description);
@@ -70,8 +74,16 @@ public sealed class CourseGroupRepository(IDbConnectionFactory connectionFactory
             """;
 
         await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
-        return await conn.ExecuteScalarAsync<short>(new CommandDefinition(
-            sql, Parameters(request), cancellationToken: ct));
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        var pkid = await conn.ExecuteScalarAsync<short>(new CommandDefinition(
+            sql, Parameters(request), tx, cancellationToken: ct));
+
+        var inserted = await LoadForAuditAsync(conn, tx, pkid, ct);
+        await auditWriter.LogInsertAsync(conn, tx, AuditTable, inserted!, ct);
+
+        await tx.CommitAsync(ct);
+        return pkid;
     }
 
     public async Task<bool> UpdateAsync(CourseGroupRequest request, CancellationToken ct = default)
@@ -83,9 +95,25 @@ public sealed class CourseGroupRepository(IDbConnectionFactory connectionFactory
             """;
 
         await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
-            sql, Parameters(request, request.Pkid), cancellationToken: ct));
-        return affected > 0;
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        // Load the "before" first so the audit's changed-column list is accurate; a missing row is the
+        // 404 case (equivalent to the old affected == 0).
+        var before = await LoadForAuditAsync(conn, tx, request.Pkid, ct);
+        if (before is null)
+        {
+            await tx.RollbackAsync(ct);
+            return false;
+        }
+
+        await conn.ExecuteAsync(new CommandDefinition(
+            sql, Parameters(request, request.Pkid), tx, cancellationToken: ct));
+
+        var after = await LoadForAuditAsync(conn, tx, request.Pkid, ct);
+        await auditWriter.LogUpdateAsync(conn, tx, AuditTable, before, after!, ct);
+
+        await tx.CommitAsync(ct);
+        return true;
     }
 
     public async Task<bool> DeleteAsync(short pkid, CancellationToken ct = default)
@@ -93,14 +121,37 @@ public sealed class CourseGroupRepository(IDbConnectionFactory connectionFactory
         // FK_Course_CourseGroup cascades, so any Course rows in the group are deleted along with it.
         // FK_PartnerCourseGroup_CourseGroup does NOT cascade, so a group still referenced by a
         // PartnerCourseGroup row throws 547. That is deliberately left to propagate: the controller
-        // turns it into a 409. (The Course cascade cannot be blocked here — the DB owns it.)
+        // turns it into a 409, and the transaction rolls back — so no audit row for a blocked delete.
+        // (The Course cascade cannot be blocked here — the DB owns it.)
         const string sql = "DELETE FROM dbo.CourseGroup WHERE pkid = @Pkid;";
 
         await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
-            sql, new { Pkid = pkid }, cancellationToken: ct));
-        return affected > 0;
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        // Load before deleting so the audit can record the row's first string column (Description).
+        var row = await LoadForAuditAsync(conn, tx, pkid, ct);
+        if (row is null)
+        {
+            await tx.RollbackAsync(ct);
+            return false;
+        }
+
+        await conn.ExecuteAsync(new CommandDefinition(sql, new { Pkid = pkid }, tx, cancellationToken: ct));
+        await auditWriter.LogDeleteAsync(conn, tx, AuditTable, row, ct);
+
+        await tx.CommitAsync(ct);
+        return true;
     }
+
+    /// <summary>
+    /// Loads the row's own columns (no derived CourseCount) as the audit before/after snapshot, on the
+    /// caller's transaction so it sees the in-flight change.
+    /// </summary>
+    private static async Task<CourseGroup?> LoadForAuditAsync(
+        DbConnection conn, DbTransaction tx, short pkid, CancellationToken ct)
+        => await conn.QuerySingleOrDefaultAsync<CourseGroup>(new CommandDefinition(
+            "SELECT pkid AS Pkid, Description FROM dbo.CourseGroup WHERE pkid = @Pkid;",
+            new { Pkid = pkid }, tx, cancellationToken: ct));
 
     private static object Parameters(CourseGroupRequest request, short? pkid = null) => new
     {
