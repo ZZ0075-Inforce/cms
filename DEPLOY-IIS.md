@@ -53,21 +53,23 @@ Run from an **elevated** PowerShell. `setup-iis.ps1` is idempotent — re-runnin
 
 ```powershell
 cd C:\dev\cms\deploy
-.\setup-iis.ps1 -GrantSqlAccess
+.\setup-iis.ps1
 ```
 
 It installs IIS, the **ASP.NET Core 9 Hosting Bundle**, **URL Rewrite** and **ARR**; enables the
-ARR proxy at server level; creates the folders, app pools and both sites; and grants the pool
-identities filesystem rights.
+ARR proxy at server level; creates the folders, app pools and both sites; grants the pool
+identities filesystem rights; and grants the API pool identity access to the `CMS` database.
 
 Because the `CMS` site takes **port 80**, the script **stops IIS's stock `Default Web Site`**,
 which ships bound to that port. It is stopped, not deleted — `Start-Website -Name 'Default Web Site'`
 brings it back (though the two will then compete for port 80). If any *other* site holds port 80,
 the script stops with an error rather than guessing.
 
-`-GrantSqlAccess` additionally creates a SQL login for `IIS APPPOOL\CMS.API.Pool` and makes it
-`db_owner` on `CMS`. You need it whenever the connection string uses **Windows auth**, because the
-site runs as the app pool identity, not as you. Omit it if the API connects with SQL auth.
+The last step creates a SQL login for `IIS APPPOOL\CMS.API.Pool` and adds it to `db_datareader` +
+`db_datawriter` on `CMS` (the API only ever runs DML, so it never needs `db_owner`). This is **not
+optional**: `deploy.ps1` hard-codes `Trusted_Connection=True`, so the site always connects as its
+app pool identity rather than as you. `-SkipSqlAccess` opts out, and is only correct if the API
+connects with SQL auth or the grant already exists.
 
 > If SQL Server lives on a **different machine** from IIS, the pool authenticates as the IIS
 > *machine account* (e.g. `DOMAIN\CMSWEB01$`), not `IIS APPPOOL\...`. Adjust `$poolLogin` in
@@ -151,7 +153,7 @@ config edit, not a rebuild.
 | API returns **500.30 / 502.5** | ASP.NET Core Hosting Bundle missing, or `arguments=".\CMS.API.dll"` doesn't match the published DLL name. |
 | Every API call **307-redirects to https** | `ASPNETCORE_ENVIRONMENT` is `Production` on an HTTP-only site. Set it to `Development` or `Staging`. |
 | Login returns **500** | The database has no `SysConfig.appConfig` row — the JWT signing key is read from it at runtime. |
-| API **500** on any data call | The app pool identity has no SQL access. The site runs as `IIS APPPOOL\CMS.API.Pool`, not as you — `setup-iis.ps1 -GrantSqlAccess` creates that login. |
+| API **500** on any data call, incl. login | The app pool identity has no SQL access. The site runs as `IIS APPPOOL\CMS.API.Pool`, not as you. Look in `C:\VHome\CMS\API\logs\stdout*.log` for `Cannot open database "CMS" ... Login failed for user 'IIS APPPOOL\CMS.API.Pool'` (error 4060) — re-run `setup-iis.ps1` (step 8 grants it; it was opt-in via `-GrantSqlAccess` before 2026-07-17, which is how a box ends up in this state). |
 | **F5 on a deep link → 404** | The SPA fallback rewrite is missing. Confirm `web.config` reached `C:\VHome\CMS\NG\` and URL Rewrite is installed. |
 | Deployed, but the browser shows the **old app** | Hard-refresh. `index.html` is served no-cache by the stamped `web.config`; a stale copy pins the old hashed bundle names. |
 | `dotnet publish` fails | Run it by hand in `src\CMS.API`. |

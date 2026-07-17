@@ -15,7 +15,7 @@
       6. Create IIS sites CMS (:80 -> NG) and CMS.API (:5001 -> API), stopping "Default Web Site"
          if it is holding port 80
       7. Grant the app-pool identities read access to their folders
-      8. -GrantSqlAccess: give the API app pool identity a SQL login on the existing CMS database
+      8. Give the API app pool identity a SQL login on the existing CMS database
 
     The CMS database is assumed to EXIST already, with its schema and runtime data in place.
     In particular the API reads its JWT signing key from the SysConfig 'appConfig' row at
@@ -24,20 +24,24 @@
     Steps 1-7 run ON the IIS server (in-process when $remote is Localhost, over PS Remoting
     otherwise). Step 8 runs from THIS machine against $SqlServer.
 
-.PARAMETER GrantSqlAccess
-    Create a SQL login for the API app pool identity and grant it on the CMS database. Needed
-    when the connection string uses Windows auth: the site runs as "IIS APPPOOL\CMS.API.Pool",
-    not as you. Skip it if the API connects with SQL authentication.
+.PARAMETER SkipSqlAccess
+    Do NOT touch SQL Server. Only correct when the API connects with SQL authentication —
+    which deploy.ps1 does not do: its connection string is hard-coded to Trusted_Connection=True,
+    so the site connects as "IIS APPPOOL\CMS.API.Pool" and that principal MUST be granted on the
+    CMS database. Skipping the grant leaves every API call failing with a bare 500 and
+    "Cannot open database "CMS" ... Login failed for user 'IIS APPPOOL\CMS.API.Pool'" (error
+    4060) buried in C:\VHome\CMS\API\logs\stdout*.log. Step 8 was opt-in until 2026-07-17 and
+    this is exactly the hole people fell into, so it now runs by default.
 
 .PARAMETER Credential
     PSCredential for a remote IIS server. Omit to use your current Windows identity.
 
 .EXAMPLE
-    .\setup-iis.ps1 -GrantSqlAccess   # full prep, Windows-auth connection string
-    .\setup-iis.ps1                   # IIS only (SQL auth, or the login already exists)
+    .\setup-iis.ps1                   # full prep, including the SQL grant (what you want)
+    .\setup-iis.ps1 -SkipSqlAccess    # IIS only — SQL auth, or the grant already exists
 #>
 param(
-    [switch]$GrantSqlAccess,
+    [switch]$SkipSqlAccess,
     [System.Management.Automation.PSCredential]$Credential
 )
 
@@ -58,7 +62,7 @@ $ngPort      = 80                                 # the SPA is the site people a
                                                   # it gets the bare http://<host>/ . IIS ships
                                                   # "Default Web Site" on :80 — the script stops it.
 
-# -GrantSqlAccess only. The database itself is assumed to exist already.
+# Step 8 (the SQL grant) only. The database itself is assumed to exist already.
 $SqlServer   = ".\SQLEXPRESS"
 $SqlDb       = "CMS"
 # ===========================================================================
@@ -269,9 +273,9 @@ Invoke-OnServer -ScriptBlock $serverSetup -ArgumentList $cfg
 Write-OK "IIS ready"
 
 # ─────────────────────────────────────────────────────────────────────
-# 8. SQL login for the app pool identity (optional) — runs from THIS machine
+# 8. SQL login for the app pool identity — runs from THIS machine, not on the IIS server
 # ─────────────────────────────────────────────────────────────────────
-if ($GrantSqlAccess) {
+if (-not $SkipSqlAccess) {
     Write-Step "Granting the API app pool access to [$SqlDb] on $SqlServer ..."
 
     if (-not (Get-Command sqlcmd -ErrorAction SilentlyContinue)) {
@@ -288,17 +292,23 @@ if ($GrantSqlAccess) {
     # machine, the pool authenticates as the IIS machine account instead — e.g. "DOMAIN\CMSWEB01$"
     # — so set $poolLogin accordingly.
     $poolLogin = "IIS APPPOOL\$apiPool"
+
+    # db_datareader + db_datawriter, NOT db_owner: the API only ever runs DML (every repository is
+    # hand-written SELECT/INSERT/UPDATE/DELETE through Dapper — no DDL, no stored procedures), and
+    # the CMS database already exists with its schema in place. db_owner would additionally let a
+    # compromised site drop the very tables it reads.
     $grant = @"
 IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'$poolLogin')
     CREATE LOGIN [$poolLogin] FROM WINDOWS;
 USE [$SqlDb];
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'$poolLogin')
     CREATE USER [$poolLogin] FOR LOGIN [$poolLogin];
-ALTER ROLE db_owner ADD MEMBER [$poolLogin];
+ALTER ROLE db_datareader ADD MEMBER [$poolLogin];
+ALTER ROLE db_datawriter ADD MEMBER [$poolLogin];
 "@
     sqlcmd -S $SqlServer -E -C -b -Q $grant
     if ($LASTEXITCODE -ne 0) { throw "Could not grant SQL access to $poolLogin" }
-    Write-OK "$poolLogin is db_owner on [$SqlDb]"
+    Write-OK "$poolLogin is db_datareader + db_datawriter on [$SqlDb]"
 }
 
 $hostName = if ($isLocal) { 'localhost' } else { $remote }
@@ -308,8 +318,12 @@ Write-Host "==================== DONE ====================" -ForegroundColor Gre
 Write-Host "  Angular site : $ngUrl  -> $sitePathNg"
 Write-Host "  API site     : http://${hostName}:$apiPort/swagger  -> $sitePathApi"
 Write-Host "  App pools    : $ngPool, $apiPool"
-if (-not $GrantSqlAccess) {
-    Write-Host "  SQL login    : not granted — if the API uses Windows auth, re-run with -GrantSqlAccess." -ForegroundColor Yellow
+if ($SkipSqlAccess) {
+    Write-Host "  SQL login    : SKIPPED by -SkipSqlAccess. deploy.ps1 uses Trusted_Connection=True," -ForegroundColor Yellow
+    Write-Host "                 so unless 'IIS APPPOOL\$apiPool' is already granted on [$SqlDb]," -ForegroundColor Yellow
+    Write-Host "                 every API call will fail with a bare 500 (SQL error 4060)." -ForegroundColor Yellow
+} else {
+    Write-Host "  SQL login    : IIS APPPOOL\$apiPool -> db_datareader + db_datawriter on [$SqlDb]"
 }
 Write-Host "============================================="
 Write-Host "Both folders are empty until you run:  .\deploy.ps1"
