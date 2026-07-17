@@ -3,6 +3,7 @@ using CMS.API.Data;
 using CMS.API.Infrastructure;
 using CMS.API.Models;
 using Dapper;
+using Microsoft.Data.SqlClient;
 
 namespace CMS.API.Repositories;
 
@@ -200,25 +201,44 @@ public sealed class FeaturedPromoItemRepository(
         }
 
         // The row (if any) currently sitting in the slot we want to move into.
+        //
+        // UPDLOCK + HOLDLOCK is load-bearing, not decoration. This is a read-check-write: under the
+        // default READ COMMITTED the shared lock is released the moment the SELECT returns, so two
+        // concurrent moves into the same empty slot BOTH read null, both take the "just set it"
+        // branch, and the second trips IX_FeaturedPromoItem_UniqueDateLocSlot. HOLDLOCK keeps a range
+        // lock on that (date, centre, slot) key until commit — including when NO row matches, which is
+        // exactly the case that races — so the second mover waits instead of colliding.
         var occupantPkid = await conn.ExecuteScalarAsync<int?>(new CommandDefinition("""
             SELECT pkid
-            FROM   dbo.FeaturedPromoItem
+            FROM   dbo.FeaturedPromoItem WITH (UPDLOCK, HOLDLOCK)
             WHERE  ScheduleOn = @ScheduleOn AND TrainingCenter_pkid = @TrainingCenterPkid AND Slot = @Slot;
             """,
             new { current.ScheduleOn, current.TrainingCenterPkid, Slot = (byte)targetSlot },
             tx, cancellationToken: ct));
 
-        if (occupantPkid is null)
+        try
         {
-            await SetSlotAsync(conn, tx, pkid, targetSlot, ct);
+            if (occupantPkid is null)
+            {
+                await SetSlotAsync(conn, tx, pkid, targetSlot, ct);
+            }
+            else
+            {
+                // Park the moving row on a temporary slot first, so neither UPDATE collides with the
+                // live UNIQUE (ScheduleOn, TrainingCenter, Slot) index mid-swap.
+                await SetSlotAsync(conn, tx, pkid, TempSlot, ct);
+                await SetSlotAsync(conn, tx, occupantPkid.Value, current.Slot, ct);
+                await SetSlotAsync(conn, tx, pkid, targetSlot, ct);
+            }
         }
-        else
+        // Backstop for anything the lock above cannot serialise — most plausibly a legacy row already
+        // parked on TempSlot (Slot is a tinyint and the DB predates this code, so 0 is storable even
+        // though the API's [Range(1,255)] forbids it). Create/Update already translate 2627 to a 409;
+        // this path used to let it escape as a bare 500, which told the user nothing.
+        catch (SqlException ex) when (SqlErrorNumbers.IsDuplicateKey(ex.Number))
         {
-            // Park the moving row on a temporary slot first, so neither UPDATE collides with the
-            // live UNIQUE (ScheduleOn, TrainingCenter, Slot) index mid-swap.
-            await SetSlotAsync(conn, tx, pkid, TempSlot, ct);
-            await SetSlotAsync(conn, tx, occupantPkid.Value, current.Slot, ct);
-            await SetSlotAsync(conn, tx, pkid, targetSlot, ct);
+            await tx.RollbackAsync(ct);
+            return SlotMoveResult.Conflict;
         }
 
         await tx.CommitAsync(ct);

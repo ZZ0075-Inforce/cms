@@ -10,6 +10,8 @@ public sealed class CourseGroupRepository(IDbConnectionFactory connectionFactory
     : ICourseGroupRepository
 {
     private const string AuditTable = "CourseGroup";
+    /// <summary>Deleting a group cascades to its Courses, which must be audited under their own table name.</summary>
+    private const string CourseAuditTable = "Course";
     // No JOIN: CourseGroup has no foreign keys. CourseCount is 對應課程數, for display in the list
     // and to size the delete-confirm warning (FK_Course_CourseGroup cascades).
     private const string SelectColumns = """
@@ -136,12 +138,43 @@ public sealed class CourseGroupRepository(IDbConnectionFactory connectionFactory
             return false;
         }
 
+        // The cascade deletes Course rows that this repository never names, and SQL Server fires no
+        // audit of its own — so without loading them FIRST, N courses vanish leaving a trail that
+        // mentions only the group. The audit is the compliance record; "the DB did it" is not an
+        // answer to "who deleted this course". Read them while they still exist.
+        var cascadedCourses = await LoadCascadedCoursesAsync(conn, tx, pkid, ct);
+
         await conn.ExecuteAsync(new CommandDefinition(sql, new { Pkid = pkid }, tx, cancellationToken: ct));
+
         await auditWriter.LogDeleteAsync(conn, tx, AuditTable, row, ct);
+        // Same conn/tx as the delete, so the trail commits or rolls back with it — a blocked delete
+        // (547 from PartnerCourseGroup) must not leave behind audit rows for courses that still exist.
+        foreach (var course in cascadedCourses)
+            await auditWriter.LogDeleteAsync(conn, tx, CourseAuditTable, course, ct);
 
         await tx.CommitAsync(ct);
         return true;
     }
+
+    /// <summary>
+    /// The Course rows FK_Course_CourseGroup is about to cascade-delete. The projection mirrors
+    /// CourseRepository.LoadForAuditAsync column for column, so a course deleted via its group audits
+    /// identically to one deleted directly — the trail must not record less just because of the route.
+    /// </summary>
+    private static async Task<IReadOnlyList<Course>> LoadCascadedCoursesAsync(
+        DbConnection conn, DbTransaction tx, short courseGroupPkid, CancellationToken ct)
+        => (await conn.QueryAsync<Course>(new CommandDefinition("""
+            SELECT c.pkid AS Pkid, c.Title, c.OfficialTitle, c.CourseId, c.ProdCourseId, c.FriendlyUrl,
+                   c.DisplayOrder,
+                   c.Partner_pkid       AS PartnerPkid,
+                   c.CourseGroup_pkid   AS CourseGroupPkid,
+                   c.PublishStatus_pkid AS PublishStatusPkid,
+                   c.ScheduleOn, c.ScheduleOff, c.Hour, c.ListPrice, c.LearningCredit,
+                   c.Material, c.Objective, c.Target, c.Prerequisites, c.Outline,
+                   c.TowardCertOrExam, c.Note, c.OtherInfo, c.CanRepeat
+            FROM   dbo.Course c
+            WHERE  c.CourseGroup_pkid = @CourseGroupPkid;
+            """, new { CourseGroupPkid = courseGroupPkid }, tx, cancellationToken: ct))).AsList();
 
     /// <summary>
     /// Loads the row's own columns (no derived CourseCount) as the audit before/after snapshot, on the

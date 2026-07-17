@@ -4,6 +4,7 @@ using CMS.API.Models;
 using CMS.API.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CMS.API.Controllers;
 
@@ -25,11 +26,20 @@ namespace CMS.API.Controllers;
 [Produces("application/json")]
 public class AuthController(IAuthRepository repository) : ControllerBase
 {
-    /// <summary>Exchanges credentials for a signed access token and the user's profile.</summary>
+    /// <summary>
+    /// Exchanges credentials for a signed access token and the user's profile.
+    ///
+    /// Rate-limited per client IP (<see cref="RateLimitPolicies.Login"/>): this is the only endpoint an
+    /// unauthenticated caller can reach, so it is the only one worth hammering. Over the limit returns
+    /// 429 — deliberately distinct from the generic 401, because "you are going too fast" is not a
+    /// statement about whether the credentials were right and reveals nothing about the account.
+    /// </summary>
     [AllowAnonymous] // Logging in cannot itself require a token.
+    [EnableRateLimiting(RateLimitPolicies.Login)]
     [HttpPost("login")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<LoginResponse>> Login(
         [FromBody] LoginRequest request, CancellationToken ct)
     {

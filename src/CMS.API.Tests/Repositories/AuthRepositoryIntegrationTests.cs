@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using CMS.API.Infrastructure;
 using CMS.API.Repositories;
 using CMS.API.Tests.Infrastructure;
@@ -21,7 +23,7 @@ public class AuthRepositoryIntegrationTests(DatabaseFixture fixture) : IAsyncLif
 {
     private const string ValidPassword = "Secret#123";
 
-    private readonly AuthRepository _repository = new(fixture.ConnectionFactory);
+    private readonly AuthRepository _repository = new(fixture.ConnectionFactory, fixture.AuditWriter);
     private readonly List<string> _createdUsers = [];
     private readonly List<string> _createdRoles = [];
     private bool _seededAppConfig;
@@ -48,9 +50,17 @@ public class AuthRepositoryIntegrationTests(DatabaseFixture fixture) : IAsyncLif
     /// <summary>A collision-proof UserId that also satisfies ^[^\s/\\]+$.</summary>
     private static string NewUserId() => $"{DatabaseFixture.Prefix}{Guid.NewGuid():N}"[..24];
 
-    /// <summary>Seeds an AppUser whose PasswordHash is the SHA-256 the repository will compare against.</summary>
-    private async Task<string> SeedUserAsync(
+    /// <summary>Seeds an AppUser whose PasswordHash is a current, salted hash of <paramref name="password"/>.</summary>
+    private Task<string> SeedUserAsync(
         string password = ValidPassword, bool isActive = true, IReadOnlyList<string>? roleIds = null)
+        => SeedUserWithHashAsync(PasswordHasher.Hash(password), isActive, roleIds);
+
+    /// <summary>
+    /// Seeds an AppUser with an EXACT stored hash. Lets a test plant a pre-2026-07-17 unsalted SHA-256
+    /// digest and prove the legacy login path against real SQL.
+    /// </summary>
+    private async Task<string> SeedUserWithHashAsync(
+        string passwordHash, bool isActive = true, IReadOnlyList<string>? roleIds = null)
     {
         var userId = NewUserId();
         _createdUsers.Add(userId);
@@ -66,7 +76,7 @@ public class AuthRepositoryIntegrationTests(DatabaseFixture fixture) : IAsyncLif
                 UserId = userId,
                 UserName = $"User {userId}",
                 IsActive = isActive,
-                PasswordHash = PasswordHasher.Hash(password)
+                PasswordHash = passwordHash
             });
 
         foreach (var roleId in roleIds ?? [])
@@ -75,6 +85,74 @@ public class AuthRepositoryIntegrationTests(DatabaseFixture fixture) : IAsyncLif
                 new { UserId = userId, RoleId = roleId });
 
         return userId;
+    }
+
+    /// <summary>A digest in exactly the format the pre-2026-07-17 PasswordHasher wrote.</summary>
+    private static string LegacySha256Of(string password) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(password)));
+
+    private async Task<string?> ReadHashAsync(string userId)
+    {
+        await using var conn = await fixture.OpenAsync();
+        return await conn.ExecuteScalarAsync<string?>(
+            "SELECT PasswordHash FROM dbo.AppUser WHERE UserId = @UserId;", new { UserId = userId });
+    }
+
+    // ---------- Legacy SHA-256 migration ----------
+
+    [IntegrationFact]
+    public async Task AuthenticateAsync_AcceptsALegacySha256Row_AndUpgradesItInPlace()
+    {
+        // Every AppUser row written before 2026-07-17 looks exactly like this. If this test fails,
+        // the hashing change locked every existing user out of the system.
+        var userId = await SeedUserWithHashAsync(LegacySha256Of(ValidPassword));
+        Assert.Equal(64, (await ReadHashAsync(userId))!.Length); // precondition: really is legacy
+
+        var user = await _repository.AuthenticateAsync(userId, ValidPassword);
+
+        Assert.NotNull(user);
+        Assert.Equal(userId, user.UserId);
+
+        // The successful login silently re-hashed the row — no reset, no user action.
+        var upgraded = await ReadHashAsync(userId);
+        Assert.StartsWith("pbkdf2-sha256$", upgraded);
+        Assert.False(PasswordHasher.NeedsRehash(upgraded));
+
+        // ...and the same password still works against the upgraded row on the next login.
+        Assert.NotNull(await _repository.AuthenticateAsync(userId, ValidPassword));
+    }
+
+    [IntegrationFact]
+    public async Task AuthenticateAsync_RejectsAWrongPasswordAgainstALegacyRow_AndLeavesItAlone()
+    {
+        var userId = await SeedUserWithHashAsync(LegacySha256Of(ValidPassword));
+
+        Assert.Null(await _repository.AuthenticateAsync(userId, "wrong-password"));
+
+        // A failed login must never rewrite the stored hash.
+        Assert.Equal(64, (await ReadHashAsync(userId))!.Length);
+    }
+
+    [IntegrationFact]
+    public async Task AuthenticateAsync_DoesNotUpgrade_AnInactiveLegacyUser()
+    {
+        // IsActive = 0 is filtered in the WHERE, so no row comes back to verify or upgrade.
+        var userId = await SeedUserWithHashAsync(LegacySha256Of(ValidPassword), isActive: false);
+
+        Assert.Null(await _repository.AuthenticateAsync(userId, ValidPassword));
+        Assert.Equal(64, (await ReadHashAsync(userId))!.Length);
+    }
+
+    [IntegrationFact]
+    public async Task AuthenticateAsync_LeavesAnAlreadyCurrentHashUntouched()
+    {
+        // Only stale hashes get rewritten — a normal login must not write to the DB.
+        var userId = await SeedUserAsync();
+        var before = await ReadHashAsync(userId);
+
+        Assert.NotNull(await _repository.AuthenticateAsync(userId, ValidPassword));
+
+        Assert.Equal(before, await ReadHashAsync(userId));
     }
 
     private async Task<string> SeedRoleAsync()
@@ -158,7 +236,7 @@ public class AuthRepositoryIntegrationTests(DatabaseFixture fixture) : IAsyncLif
     // ---------- UpdatePasswordAsync ----------
 
     [IntegrationFact]
-    public async Task UpdatePasswordAsync_SetsHashToSha256OfNew_AndBumpsUpdatedTime()
+    public async Task UpdatePasswordAsync_StoresASaltedHashOfNew_AndBumpsUpdatedTime()
     {
         var userId = await SeedUserAsync();
         var (_, originalTime) = await ReadPasswordAsync(userId);
@@ -169,8 +247,13 @@ public class AuthRepositoryIntegrationTests(DatabaseFixture fixture) : IAsyncLif
         Assert.True(ok);
         var (storedHash, updatedTime) = await ReadPasswordAsync(userId);
 
-        // PasswordHash is exactly SHA-256(new).
-        Assert.Equal(PasswordHasher.Hash(newPassword), storedHash);
+        // Asserted by verifying, not by comparing to a re-computed hash: the hash is salted, so
+        // Hash(newPassword) yields a DIFFERENT string every call and equality would always fail.
+        // What matters is the behaviour, not the bytes.
+        Assert.True(PasswordHasher.Verify(newPassword, storedHash));
+        // ...and the stored value is a real salted hash, not the plaintext or a bare digest.
+        Assert.NotEqual(newPassword, storedHash);
+        Assert.StartsWith("pbkdf2-sha256$", storedHash);
         // The new password now verifies and the old one no longer does.
         Assert.True(await _repository.VerifyPasswordAsync(userId, newPassword));
         Assert.False(await _repository.VerifyPasswordAsync(userId, ValidPassword));

@@ -1,6 +1,7 @@
 using CMS.API.Infrastructure;
 using CMS.API.Models;
 using CMS.API.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 
@@ -11,8 +12,16 @@ namespace CMS.API.Controllers;
 /// The resource identity is <c>RoleId</c> (the table's actual primary key), not <c>pkid</c> —
 /// pkid is an IDENTITY column with no PK/UNIQUE constraint, so the DB never promises it is unique.
 /// Hence the untyped <c>{id}</c> route segment (no <c>:int</c> constraint).
+///
+/// Admin-only at the CLASS level: <see cref="AppRoleRequest.UserIds"/> assigns users to a role, so
+/// this is the same privilege-escalation surface as AppUsersController approached from the other side
+/// — a merely-authenticated caller could PUT itself into `Admin`. Worse, the n-n sync is
+/// delete-then-reinsert, so a payload naming only the caller silently unassigns every OTHER member of
+/// the role. Both reads and writes are gated: the role list is administrative data, and only the
+/// (Admin-only) AppUser screens consume it.
 /// </summary>
 [ApiController]
+[Authorize(Roles = "Admin")]
 [Route("api/app-roles")]
 [Produces("application/json")]
 public class AppRolesController(IAppRoleRepository repository) : ControllerBase

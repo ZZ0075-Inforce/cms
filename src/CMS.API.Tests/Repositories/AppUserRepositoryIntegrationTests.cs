@@ -1,3 +1,5 @@
+using System.Text.Json;
+using CMS.API.Infrastructure;
 using CMS.API.Models;
 using CMS.API.Repositories;
 using CMS.API.Tests.Infrastructure;
@@ -236,8 +238,15 @@ public class AppUserRepositoryIntegrationTests(DatabaseFixture fixture) : IAsync
         // PasswordHash is set backend-side and never surfaces in the model — read it raw.
         var hash = await ReadPasswordHashAsync(request.UserId);
         Assert.False(string.IsNullOrEmpty(hash));
-        Assert.Equal(64, hash!.Length);             // SHA-256 lowercase hex
-        Assert.Matches("^[0-9a-f]{64}$", hash);
+        // A salted PBKDF2 hash, not the old bare SHA-256 hex digest.
+        Assert.StartsWith("pbkdf2-sha256$", hash);
+        Assert.False(PasswordHasher.NeedsRehash(hash));
+        // Two accounts created from the SAME SysConfig default password must NOT share a hash.
+        // Under the old unsalted digest they were byte-identical, so one glance at the column
+        // revealed every never-logged-in account. The salt is what breaks that tell.
+        var second = NewRequest();
+        await _repository.InsertAsync(second);
+        Assert.NotEqual(hash, await ReadPasswordHashAsync(second.UserId));
     }
 
     [IntegrationFact]
@@ -337,11 +346,12 @@ public class AppUserRepositoryIntegrationTests(DatabaseFixture fixture) : IAsync
     // ---------- Reset password ----------
 
     [IntegrationFact]
-    public async Task ResetPasswordAsync_RestoresDefaultHash_AndReturnsTrueForExistingUser()
+    public async Task ResetPasswordAsync_RestoresTheDefaultPassword_AndReturnsTrueForExistingUser()
     {
         var request = NewRequest();
         await _repository.InsertAsync(request);
-        var defaultHash = await ReadPasswordHashAsync(request.UserId);
+        var defaultPassword = await ReadDefaultPasswordAsync();
+        var hashOnCreate = await ReadPasswordHashAsync(request.UserId);
 
         // Corrupt the stored hash so the reset is observable.
         await using (var conn = await fixture.OpenAsync())
@@ -350,12 +360,28 @@ public class AppUserRepositoryIntegrationTests(DatabaseFixture fixture) : IAsync
                 "UPDATE dbo.AppUser SET PasswordHash = 'corrupted' WHERE UserId = @UserId;",
                 new { request.UserId });
         }
-        Assert.NotEqual(defaultHash, await ReadPasswordHashAsync(request.UserId));
+        Assert.NotEqual(hashOnCreate, await ReadPasswordHashAsync(request.UserId));
 
         var reset = await _repository.ResetPasswordAsync(request.UserId);
 
         Assert.True(reset);
-        Assert.Equal(defaultHash, await ReadPasswordHashAsync(request.UserId));
+        var hashAfterReset = await ReadPasswordHashAsync(request.UserId);
+
+        // The assertion is "the default password works again", not "the same bytes came back":
+        // the hash is salted, so restoring the same password necessarily yields a different string.
+        Assert.True(PasswordHasher.Verify(defaultPassword, hashAfterReset));
+        // ...and that difference is the point — a fresh salt every time.
+        Assert.NotEqual(hashOnCreate, hashAfterReset);
+    }
+
+    /// <summary>The default password currently in SysConfig — seeded by the fixture, or pre-existing.</summary>
+    private async Task<string> ReadDefaultPasswordAsync()
+    {
+        await using var conn = await fixture.OpenAsync();
+        var json = await conn.ExecuteScalarAsync<string>(
+            "SELECT configValue FROM dbo.SysConfig WHERE configKey = 'appConfig';");
+
+        return JsonDocument.Parse(json!).RootElement.GetProperty("defaultPassword").GetString()!;
     }
 
     [IntegrationFact]

@@ -12,7 +12,13 @@ public enum SlotMoveResult
     OutOfRange,
 
     /// <summary>The row moved (swapping with the occupant of the target slot, if any).</summary>
-    Moved
+    Moved,
+
+    /// <summary>
+    /// The move collided with the UNIQUE (ScheduleOn, TrainingCenter, Slot) index and was rolled back.
+    /// A 409, not a 500: the data is intact and retrying is a reasonable thing for the caller to do.
+    /// </summary>
+    Conflict
 }
 
 public interface IFeaturedPromoItemRepository

@@ -26,8 +26,15 @@ Backend — every repository write logs via the shared `IRowAuditWriter`:
     changed property names (capped 1000 chars).
   - `UserName` = the JWT `userName` claim, else `"system"`.
   - **Never insert `pkid`** (IDENTITY).
-- Out of scope: non-CRUD writes such as `FeaturedPromoItemRepository.MoveSlotAsync` and
-  `AppUserRepository.ResetPasswordAsync` are not audited.
+- Out of scope — the **complete** list of unaudited writes, not an illustrative one:
+  `FeaturedPromoItemRepository.MoveSlotAsync` (a display-order nudge, not a data change) and
+  `AppUserRepository.ResetPasswordAsync`. Anything not named here is audited, including
+  `AuthRepository.UpdatePasswordAsync` / `UpdateUserNameAsync` (self-service change-password and
+  rename, audited under `AppUser`). If you add a write, audit it or add it to this list — the list
+  was previously read as "such as…" and two security-relevant writes quietly landed outside it.
+- Deleting a row whose FK **cascades** must audit the cascaded children too: SQL Server fires no
+  audit of its own, so load them before the delete and log one entry each on the same transaction
+  (see `CourseGroupRepository.DeleteAsync`, which cascades to `Course`).
 
 Frontend — every detail page and form page:
 

@@ -130,6 +130,15 @@ public class FeaturedPromoItemsController(IFeaturedPromoItemRepository repositor
         {
             SlotMoveResult.Moved => NoContent(),
             SlotMoveResult.NotFound => NotFound(NotFoundMessage(id)),
+            // Explicit, not folded into the catch-all below: a Conflict is someone else having moved
+            // the same slot concurrently, and telling that user "已到達第一或最後一個版位" would be
+            // a plain lie about why their click did nothing.
+            SlotMoveResult.Conflict => Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "版位衝突",
+                Detail = "這個版位剛剛被其他人異動，請重新整理後再試一次。"
+            }),
             _ => BadRequest(new ProblemDetails
             {
                 Status = StatusCodes.Status400BadRequest,

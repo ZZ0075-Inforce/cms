@@ -15,8 +15,17 @@ namespace CMS.API.Controllers;
 ///
 /// PasswordHash is never accepted or returned. It is set from the SysConfig default on create and
 /// only changed via <see cref="ResetPassword"/>.
+///
+/// Admin-only at the CLASS level, and that placement is load-bearing. <see cref="AppUserRequest.RoleIds"/>
+/// travels in the body of both POST and PUT, and the repository syncs it straight into AppUserRole —
+/// which the JWT then reads one `role` claim per row from. So a merely-authenticated caller reaching
+/// Update could PUT itself `roleIds: ["Admin"]` and re-login as an administrator. Gating only the
+/// obviously-sensitive action (reset-password) would leave that door open and make this one pointless.
+/// The Angular sidebar hides this area from non-Admins (app.ts), but that is cosmetic — the route is
+/// reachable by URL and a hidden menu item is not security.
 /// </summary>
 [ApiController]
+[Authorize(Roles = "Admin")]
 [Route("api/app-users")]
 [Produces("application/json")]
 public class AppUsersController(IAppUserRepository repository) : ControllerBase

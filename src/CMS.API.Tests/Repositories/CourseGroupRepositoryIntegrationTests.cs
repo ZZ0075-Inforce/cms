@@ -1,6 +1,7 @@
 using CMS.API.Models;
 using CMS.API.Repositories;
 using CMS.API.Tests.Infrastructure;
+using Dapper;
 
 namespace CMS.API.Tests.Repositories;
 
@@ -178,5 +179,78 @@ public class CourseGroupRepositoryIntegrationTests(DatabaseFixture fixture) : IA
     public async Task DeleteAsync_ReturnsFalse_WhenMissing()
     {
         Assert.False(await _repository.DeleteAsync(-1));
+    }
+
+    [IntegrationFact]
+    public async Task DeleteAsync_AuditsEveryCourseTheCascadeTakesWithIt()
+    {
+        // The only test that puts a Course inside the group before deleting it. FK_Course_CourseGroup
+        // is ON DELETE CASCADE, so the DB silently removes the course too — and SQL Server writes no
+        // audit of its own. Without this, N courses can vanish leaving a trail naming only the group.
+        var partners = new PartnerRepository(fixture.ConnectionFactory, fixture.AuditWriter);
+        var courses = new CourseRepository(fixture.ConnectionFactory, fixture.AuditWriter);
+
+        var partnerPkid = await partners.InsertAsync(new PartnerRequest
+        {
+            Name = DatabaseFixture.NewPartnerName(),
+            AppKey = DatabaseFixture.NewAppKey(),
+            NameOnPartnerMenu = "測試選單",
+            NameOnCourseDetailPage = "測試",
+            DisplayOrder = 500
+        });
+
+        try
+        {
+            var groupPkid = await _repository.InsertAsync(NewRequest()); // NOT registered for cleanup:
+                                                                        // this test deletes it itself.
+            var courseTitle = $"{DatabaseFixture.Prefix}cascade-{Guid.NewGuid():N}"[..24];
+            var coursePkid = await courses.InsertAsync(new CourseRequest
+            {
+                Title = courseTitle,
+                CourseId = DatabaseFixture.NewCourseId(),
+                ProdCourseId = DatabaseFixture.NewCourseId(),
+                FriendlyUrl = DatabaseFixture.NewCourseId(),
+                DisplayOrder = 500,
+                PartnerPkid = partnerPkid,
+                CourseGroupPkid = groupPkid,
+                PublishStatusPkid = await fixture.AnyPublishStatusPkidAsync(),
+                ScheduleOn = new DateOnly(2026, 1, 1),
+                ScheduleOff = new DateOnly(2036, 1, 1),
+                Hour = 21,
+                ListPrice = 15000m,
+                LearningCredit = 3.5m
+            });
+
+            var deleted = await _repository.DeleteAsync(groupPkid);
+
+            Assert.True(deleted);
+            // The cascade really did fire — the course is gone.
+            Assert.Null(await courses.GetByIdAsync(coursePkid));
+
+            // ...and the trail records it as a Course delete in its own right, keyed on the course's
+            // own pkid, not merely as a side note on the group.
+            await using var conn = await fixture.OpenAsync();
+            var auditedCourseDeletes = await conn.QueryAsync<string>(
+                """
+                SELECT ActionDesc FROM dbo.RowAudit
+                WHERE TableName = 'Course' AND ActionType = 'Delete' AND PrimaryKeyValues = @Pkid;
+                """,
+                new { Pkid = coursePkid.ToString() });
+
+            Assert.Contains(courseTitle, auditedCourseDeletes);
+
+            // The group's own delete is still audited too — the child rows are additional, not a swap.
+            var groupDeletes = await conn.ExecuteScalarAsync<int>(
+                """
+                SELECT COUNT(*) FROM dbo.RowAudit
+                WHERE TableName = 'CourseGroup' AND ActionType = 'Delete' AND PrimaryKeyValues = @Pkid;
+                """,
+                new { Pkid = groupPkid.ToString() });
+            Assert.Equal(1, groupDeletes);
+        }
+        finally
+        {
+            await partners.DeleteAsync(partnerPkid);
+        }
     }
 }

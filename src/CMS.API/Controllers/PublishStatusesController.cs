@@ -1,6 +1,7 @@
 using CMS.API.Infrastructure;
 using CMS.API.Models;
 using CMS.API.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 
@@ -11,8 +12,14 @@ namespace CMS.API.Controllers;
 /// The resource identity is <c>pkid</c> — here it is the primary key (PK_PublishingStatus over a
 /// tinyint), so the route carries an <c>:int</c> constraint. Unlike Partner, the pkid is NOT an
 /// IDENTITY: the client supplies it on create, so a duplicate is a real 409.
+///
+/// Admin-only at the CLASS level, matching the 系統管理 Admin sidebar group this screen lives in.
+/// This does NOT starve the Course form of its 上架狀態 dropdown: that reads
+/// <c>GET /api/lookups/publish-statuses</c> on LookupsController, which stays open to any
+/// authenticated user. Editing the status vocabulary is administrative; selecting from it is not.
 /// </summary>
 [ApiController]
+[Authorize(Roles = "Admin")]
 [Route("api/publish-statuses")]
 [Produces("application/json")]
 public class PublishStatusesController(IPublishStatusRepository repository) : ControllerBase
