@@ -27,12 +27,21 @@ IDENTITY primary key. Read the DDL per table.
 `AppUser.PasswordHash` (nvarchar(800)) **never crosses the API boundary** — it is absent from
 `AppUserRequest` and every Angular model, and never SELECTed into the response.
 
+- **Hashing is salted PBKDF2-HMAC-SHA256**, not a bare digest — `Infrastructure/PasswordHasher`, stored
+  as `pbkdf2-sha256$<iterations>$<salt>$<subkey>`. The work factor travels *with* the hash, so raising
+  it never invalidates existing passwords. `Verify` still accepts the pre-2026-07-17 bare 64-char SHA-256
+  hex, and `NeedsRehash` flags those for silent upgrade on the next successful login; once no 64-char hex
+  remains in the column, that legacy path can be deleted. **Never compare a hash in SQL** — it is salted,
+  so there is no precomputable value to match on; read it out and use `PasswordHasher.Verify`.
 - **Create**: read `SysConfig.configValue` where `configKey = 'appConfig'` (a JSON object), extract
-  `defaultPassword`, SHA-256 it via `Infrastructure/PasswordHasher`, store; also stamp
-  `PasswordUpdatedTime = now`. A missing config/property throws (server-config fault, not client error).
+  `defaultPassword`, hash it, store; also stamp `PasswordUpdatedTime = now`. A missing config/property
+  throws (server-config fault, not client error).
 - **Update**: never touches `PasswordHash` / `PasswordUpdatedTime`.
-- **Reset**: `POST /api/app-users/{id}/reset-password` re-hashes the same default and re-stamps the
-  time. No password value is ever accepted from the client.
+- **Reset**: `POST /api/app-users/{id}/reset-password` (Admin-only) re-hashes the same default,
+  re-stamps the time, and audits. No password value is ever accepted from the client.
+- **A failed credential check must cost the same as a successful one.** `AuthenticateAsync` calls
+  `PasswordHasher.SimulateVerifyCost` when the user is unknown or inactive, so an attacker cannot tell
+  accounts apart by timing a ~200ms KDF that only runs for real users. Keep it on every new fail path.
 
 ## Traps already hit — keep these guards
 

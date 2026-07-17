@@ -2,6 +2,24 @@
 
 Read this before writing or running tests.
 
+## Authorization cannot be tested from a controller unit test
+
+`[Authorize]` is an MVC **pipeline filter**. A test that news up the controller directly
+(`new AppUsersController(repo)`) never runs the pipeline, so it passes whether the attribute is
+present, absent or misspelled. Authorization is structurally invisible to it.
+
+This is not theoretical: a privilege escalation survived 26 commits behind a test that could not fail.
+Verified by deleting the gate — every controller unit test stayed green; only the
+`WebApplicationFactory` tests went red.
+
+- Any change to an auth gate MUST be covered through `WebApplicationFactory`
+  (`CMS.API.Tests/Infrastructure/AdminAuthTestFactory.cs`), which boots the real pipeline.
+- `Controllers/AuthorizationConventionTests.cs` reflects over the **whole** controller surface and
+  asserts the expected gate per endpoint, so a new endpoint is covered the moment it compiles. If it
+  fails, add the attribute — do not add an exemption without a reason you would defend in a review.
+- The Angular sidebar's Admin check is **cosmetic**; routes are reachable by typing the URL. The
+  server is the only authority.
+
 ## xUnit is v2 here
 
 There is no `Assert.Skip` / `SkipUnless` (that is v3). Use the `[IntegrationFact]` /
