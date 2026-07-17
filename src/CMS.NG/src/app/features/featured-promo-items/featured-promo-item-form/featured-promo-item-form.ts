@@ -95,6 +95,10 @@ export class FeaturedPromoItemForm implements OnInit {
       return;
     }
     if (this.promoCodeResolved()) return;   // already resolved for this exact code
+    // The field's (blur) and the 查詢 button's (onClick) both land here, and clicking the button
+    // blurs the field — so one press calls this twice, the second before the first has answered
+    // and cleared `lookingUp`. The resolved-check above cannot absorb it: nothing is resolved yet.
+    if (this.lookingUp()) return;
 
     this.lookingUp.set(true);
     this.lookupError.set(null);
