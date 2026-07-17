@@ -201,14 +201,39 @@ public sealed class AppUserRepository(IDbConnectionFactory connectionFactory, IR
             """;
 
         await using var conn = await connectionFactory.CreateOpenConnectionAsync(ct);
+
+        // Hash before opening the transaction, as InsertAsync does: the KDF costs ~200ms of CPU and
+        // holding a write transaction open across it buys nothing.
         var passwordHash = await HashDefaultPasswordAsync(conn, null, ct);
 
-        var affected = await conn.ExecuteAsync(new CommandDefinition(
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        // Load "before" first: it doubles as the existence check (the old affected == 0 short-circuit)
+        // and gives the audit an accurate changed-column list.
+        var before = await LoadForAuditAsync(conn, tx, userId, ct);
+        if (before is null)
+        {
+            await tx.RollbackAsync(ct);
+            return false;
+        }
+
+        await conn.ExecuteAsync(new CommandDefinition(
             sql,
             new { UserId = userId, PasswordHash = passwordHash, Now = DateTime.Now },
-            cancellationToken: ct));
+            tx, cancellationToken: ct));
 
-        return affected > 0;
+        // An admin resetting someone else's password is the most sensitive action in this app, so it
+        // is the last one that should be invisible — it audits like every other write (CLAUDE.md's
+        // Row Audit rule), on the same conn/tx. Mirrors AuthRepository.UpdatePasswordAsync: the entry
+        // is an AppUser Update whose changed column is PasswordUpdatedTime. Nothing about the secret
+        // reaches the trail — AppUser carries no PasswordHash property (LoadForAuditAsync does not
+        // select it), and an Update entry records changed property NAMES, not values. So it says
+        // "this account's password was reset, by this admin, at this time", which is the useful part.
+        var after = await LoadForAuditAsync(conn, tx, userId, ct);
+        await auditWriter.LogUpdateAsync(conn, tx, AuditTable, before, after!, ct);
+
+        await tx.CommitAsync(ct);
+        return true;
     }
 
     /// <summary>
@@ -250,8 +275,10 @@ public sealed class AppUserRepository(IDbConnectionFactory connectionFactory, IR
 
     /// <summary>
     /// Reads the default password out of SysConfig (configKey='appConfig', a JSON object with a
-    /// `defaultPassword` property) and SHA-256 hashes it. Throws if the config or property is missing —
-    /// that is a server-configuration fault, not a client error.
+    /// `defaultPassword` property) and hashes it via <see cref="PasswordHasher.Hash"/> — salted
+    /// PBKDF2, so two accounts seeded from the same default no longer share a byte-identical hash.
+    /// Throws if the config or property is missing — that is a server-configuration fault, not a
+    /// client error.
     /// </summary>
     private static async Task<string> HashDefaultPasswordAsync(
         DbConnection conn, DbTransaction? tx, CancellationToken ct)
