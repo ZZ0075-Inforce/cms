@@ -69,11 +69,24 @@ The last step creates a SQL login for `IIS APPPOOL\CMS.API.Pool` and adds it to 
 `db_datawriter` on `CMS` (the API only ever runs DML, so it never needs `db_owner`). This is **not
 optional**: `deploy.ps1` hard-codes `Trusted_Connection=True`, so the site always connects as its
 app pool identity rather than as you. `-SkipSqlAccess` opts out, and is only correct if the API
-connects with SQL auth or the grant already exists.
+connects with SQL auth.
 
-> If SQL Server lives on a **different machine** from IIS, the pool authenticates as the IIS
-> *machine account* (e.g. `DOMAIN\CMSWEB01$`), not `IIS APPPOOL\...`. Adjust `$poolLogin` in
-> `setup-iis.ps1`.
+The step also **drops `db_owner`** if an older run granted it — adding the two lesser roles is a
+no-op for a principal that already owns the database, so the drop is the only thing that actually
+converges a box provisioned before 2026-07-17. That's why `-SkipSqlAccess` is *not* the right
+answer just because the login already exists. The script finishes by reading the membership back
+out of SQL Server and printing what it really found, so the banner can't claim a downgrade that
+didn't happen.
+
+If the grant fails (no `sqlcmd`, unreachable instance, or you lack `securityadmin`), step 8
+**warns and prints the T-SQL** instead of failing the run — IIS is already built by that point, so
+it hands the statements to whoever holds the rights rather than throwing the build away.
+
+> If SQL Server lives on a **different machine** from IIS, two things change. The pool
+> authenticates as the IIS *machine account* (e.g. `DOMAIN\CMSWEB01$`), not `IIS APPPOOL\...` —
+> adjust `$poolLogin`. And `$SqlServer` is resolved on **the machine you run the script from**,
+> not on the IIS box, so its default `.\SQLEXPRESS` will grant your own dev database and leave
+> production ungranted. Point it at the real instance.
 
 ### For a remote IIS server
 
@@ -153,7 +166,7 @@ config edit, not a rebuild.
 | API returns **500.30 / 502.5** | ASP.NET Core Hosting Bundle missing, or `arguments=".\CMS.API.dll"` doesn't match the published DLL name. |
 | Every API call **307-redirects to https** | `ASPNETCORE_ENVIRONMENT` is `Production` on an HTTP-only site. Set it to `Development` or `Staging`. |
 | Login returns **500** | The database has no `SysConfig.appConfig` row — the JWT signing key is read from it at runtime. |
-| API **500** on any data call, incl. login | The app pool identity has no SQL access. The site runs as `IIS APPPOOL\CMS.API.Pool`, not as you. Look in `C:\VHome\CMS\API\logs\stdout*.log` for `Cannot open database "CMS" ... Login failed for user 'IIS APPPOOL\CMS.API.Pool'` (error 4060) — re-run `setup-iis.ps1` (step 8 grants it; it was opt-in via `-GrantSqlAccess` before 2026-07-17, which is how a box ends up in this state). |
+| API **500** on any data call, incl. login | The app pool identity has no SQL access. The site runs as `IIS APPPOOL\CMS.API.Pool`, not as you. Look in `C:\VHome\CMS\API\logs\stdout*.log` for `Cannot open database "CMS" ... Login failed for user 'IIS APPPOOL\CMS.API.Pool'` (error 4060) — re-run `setup-iis.ps1` (step 8 grants it; it was opt-in via `-GrantSqlAccess` before 2026-07-17, which is how a box ends up in this state). Re-running is also how a box granted `db_owner` by the old script gets downgraded — check the `SQL login` line in the banner for the roles it read back. |
 | **F5 on a deep link → 404** | The SPA fallback rewrite is missing. Confirm `web.config` reached `C:\VHome\CMS\NG\` and URL Rewrite is installed. |
 | Deployed, but the browser shows the **old app** | Hard-refresh. `index.html` is served no-cache by the stamped `web.config`; a stale copy pins the old hashed bundle names. |
 | `dotnet publish` fails | Run it by hand in `src\CMS.API`. |

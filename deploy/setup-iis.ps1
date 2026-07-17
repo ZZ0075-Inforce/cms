@@ -15,14 +15,22 @@
       6. Create IIS sites CMS (:80 -> NG) and CMS.API (:5001 -> API), stopping "Default Web Site"
          if it is holding port 80
       7. Grant the app-pool identities read access to their folders
-      8. Give the API app pool identity a SQL login on the existing CMS database
+      8. Give the API app pool identity a SQL login on the existing CMS database, as
+         db_datareader + db_datawriter (dropping db_owner if an older run granted it)
 
     The CMS database is assumed to EXIST already, with its schema and runtime data in place.
     In particular the API reads its JWT signing key from the SysConfig 'appConfig' row at
     startup — if that row is missing, login returns 500 no matter how well IIS is configured.
 
     Steps 1-7 run ON the IIS server (in-process when $remote is Localhost, over PS Remoting
-    otherwise). Step 8 runs from THIS machine against $SqlServer.
+    otherwise). Step 8 runs from THIS machine against $SqlServer — so if you point $remote at
+    a real server, check $SqlServer too: its ".\" means the machine you are TYPING on, while
+    the same ".\" in deploy.ps1's connection string means the IIS box. Left alone, a remote
+    deploy grants your own dev database and leaves production ungranted.
+
+    Step 8 is non-fatal. It runs last, after steps 1-7 have already installed IIS and created
+    the sites, so it warns and prints the T-SQL for a DBA rather than throwing away a good IIS
+    build over a permissions problem.
 
 .PARAMETER SkipSqlAccess
     Do NOT touch SQL Server. Only correct when the API connects with SQL authentication —
@@ -32,6 +40,9 @@
     "Cannot open database "CMS" ... Login failed for user 'IIS APPPOOL\CMS.API.Pool'" (error
     4060) buried in C:\VHome\CMS\API\logs\stdout*.log. Step 8 was opt-in until 2026-07-17 and
     this is exactly the hole people fell into, so it now runs by default.
+
+    Note that skipping also skips the db_owner DROP, so a box provisioned by the old script
+    stays db_owner. There is no reason to pass this switch just because the login exists.
 
 .PARAMETER Credential
     PSCredential for a remote IIS server. Omit to use your current Windows identity.
@@ -275,17 +286,18 @@ Write-OK "IIS ready"
 # ─────────────────────────────────────────────────────────────────────
 # 8. SQL login for the app pool identity — runs from THIS machine, not on the IIS server
 # ─────────────────────────────────────────────────────────────────────
+# Set by step 8 so the DONE banner can report the roles SQL Server actually holds, rather
+# than asserting the state we hoped the ALTER ROLEs produced.
+$sqlAccessNote = "not attempted"
+$sqlAccessOk   = $false
+
 if (-not $SkipSqlAccess) {
     Write-Step "Granting the API app pool access to [$SqlDb] on $SqlServer ..."
 
-    if (-not (Get-Command sqlcmd -ErrorAction SilentlyContinue)) {
-        throw "sqlcmd not found. Install the SQL Server command line tools, or run the GRANT in SSMS by hand."
-    }
-
-    sqlcmd -S $SqlServer -E -C -b -Q "IF DB_ID(N'$SqlDb') IS NULL RAISERROR('Database [$SqlDb] does not exist on $SqlServer', 16, 1);"
-    if ($LASTEXITCODE -ne 0) {
-        throw "Database [$SqlDb] not found on $SqlServer. This script assumes it already exists — create it, apply the schema, and make sure the SysConfig 'appConfig' row is there."
-    }
+    # PS 7.4+ turns a non-zero native exit code into a TERMINATING error while
+    # $ErrorActionPreference is 'Stop'. Step 8 must stay non-fatal — steps 1-7 have already
+    # mutated the server — so read $LASTEXITCODE ourselves instead. (Harmless no-op on 5.1.)
+    $PSNativeCommandUseErrorActionPreference = $false
 
     # With a Windows-auth connection string the API connects as its app pool identity, NOT as you.
     # On a LOCAL SQL Server that identity is "IIS APPPOOL\CMS.API.Pool". If SQL lives on ANOTHER
@@ -297,6 +309,11 @@ if (-not $SkipSqlAccess) {
     # hand-written SELECT/INSERT/UPDATE/DELETE through Dapper — no DDL, no stored procedures), and
     # the CMS database already exists with its schema in place. db_owner would additionally let a
     # compromised site drop the very tables it reads.
+    #
+    # The db_owner DROP is what CONVERGES a box provisioned by the pre-2026-07-17 script, which
+    # granted db_owner. Adding a principal to db_datareader/db_datawriter is a silent no-op when
+    # it is already db_owner, so without the DROP the only over-privileged boxes in existence are
+    # exactly the ones that stay over-privileged.
     $grant = @"
 IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'$poolLogin')
     CREATE LOGIN [$poolLogin] FROM WINDOWS;
@@ -305,10 +322,76 @@ IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'$poolLogin')
     CREATE USER [$poolLogin] FOR LOGIN [$poolLogin];
 ALTER ROLE db_datareader ADD MEMBER [$poolLogin];
 ALTER ROLE db_datawriter ADD MEMBER [$poolLogin];
+IF IS_ROLEMEMBER('db_owner', N'$poolLogin') = 1
+    ALTER ROLE db_owner DROP MEMBER [$poolLogin];
 "@
-    sqlcmd -S $SqlServer -E -C -b -Q $grant
-    if ($LASTEXITCODE -ne 0) { throw "Could not grant SQL access to $poolLogin" }
-    Write-OK "$poolLogin is db_datareader + db_datawriter on [$SqlDb]"
+
+    # Read the membership back out of the server. This is the only statement here that can
+    # honestly report what the pool identity ended up with.
+    #
+    # Scope with -d, NOT an inline "USE [$SqlDb];": USE emits "Changed database context to..."
+    # on STDOUT, which lands in the captured rows and gets reported as though it were a role.
+    $readBack = @"
+SET NOCOUNT ON;
+SELECT r.name
+FROM sys.database_role_members m
+JOIN sys.database_principals r ON r.principal_id = m.role_principal_id
+JOIN sys.database_principals u ON u.principal_id = m.member_principal_id
+WHERE u.name = N'$poolLogin'
+ORDER BY r.name;
+"@
+
+    $sqlFail = $null
+
+    if (-not (Get-Command sqlcmd -ErrorAction SilentlyContinue)) {
+        $sqlFail = "sqlcmd is not installed on this machine."
+    }
+
+    if (-not $sqlFail) {
+        # Do NOT collapse "unreachable", "no rights" and "no such database" into one message:
+        # telling someone to go create a CMS database when the real fault is a stopped instance
+        # is how you end up running database\*.sql against a live box.
+        sqlcmd -S $SqlServer -E -C -b -Q "SET NOCOUNT ON; IF DB_ID(N'$SqlDb') IS NULL RAISERROR('missing', 16, 1);" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            $sqlFail = "Could not confirm [$SqlDb] on $SqlServer (sqlcmd exit $LASTEXITCODE). The instance is unreachable, you lack rights on it, or the database is not there."
+        }
+    }
+
+    if (-not $sqlFail) {
+        sqlcmd -S $SqlServer -E -C -b -Q $grant
+        if ($LASTEXITCODE -ne 0) {
+            $sqlFail = "The grant failed on $SqlServer (sqlcmd exit $LASTEXITCODE) — you most likely lack securityadmin/db_owner there."
+        }
+    }
+
+    if (-not $sqlFail) {
+        $roleRows = sqlcmd -S $SqlServer -d $SqlDb -E -C -b -h -1 -W -Q $readBack
+        $roles = @($roleRows | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -notmatch '^\(' })
+        if ($LASTEXITCODE -ne 0 -or $roles.Count -eq 0) {
+            $sqlFail = "The grant reported success but reading the membership back found nothing for $poolLogin."
+        } else {
+            $roleList = $roles -join ' + '
+            $sqlAccessNote = "$poolLogin -> $roleList on [$SqlDb]"
+            $sqlAccessOk   = $true
+            Write-OK "$poolLogin is $roleList on [$SqlDb]"
+            if ($roles -contains 'db_owner') {
+                Write-Host "   !! Still db_owner — the DROP did not take. If this login owns [$SqlDb]," -ForegroundColor Yellow
+                Write-Host "      reassign the owner (ALTER AUTHORIZATION ON DATABASE::[$SqlDb] TO [sa]) and re-run." -ForegroundColor Yellow
+            }
+        }
+    }
+
+    if ($sqlFail) {
+        # Non-fatal by design: steps 1-7 already installed IIS, stopped Default Web Site and
+        # created the sites. Losing all of that to a red SQL error helps nobody — print the
+        # exact T-SQL instead so it can go to whoever does hold the rights.
+        Write-Host "   !! $sqlFail" -ForegroundColor Yellow
+        Write-Host "      IIS itself is ready. Run this against $SqlServer by hand (SSMS or sqlcmd):" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host $grant -ForegroundColor DarkYellow
+        Write-Host ""
+        $sqlAccessNote = "NOT granted — $sqlFail"
+    }
 }
 
 $hostName = if ($isLocal) { 'localhost' } else { $remote }
@@ -322,8 +405,12 @@ if ($SkipSqlAccess) {
     Write-Host "  SQL login    : SKIPPED by -SkipSqlAccess. deploy.ps1 uses Trusted_Connection=True," -ForegroundColor Yellow
     Write-Host "                 so unless 'IIS APPPOOL\$apiPool' is already granted on [$SqlDb]," -ForegroundColor Yellow
     Write-Host "                 every API call will fail with a bare 500 (SQL error 4060)." -ForegroundColor Yellow
+} elseif ($sqlAccessOk) {
+    Write-Host "  SQL login    : $sqlAccessNote"
 } else {
-    Write-Host "  SQL login    : IIS APPPOOL\$apiPool -> db_datareader + db_datawriter on [$SqlDb]"
+    Write-Host "  SQL login    : $sqlAccessNote" -ForegroundColor Yellow
+    Write-Host "                 The T-SQL to fix it was printed above. Until it runs, every API" -ForegroundColor Yellow
+    Write-Host "                 call will fail with a bare 500 (SQL error 4060)." -ForegroundColor Yellow
 }
 Write-Host "============================================="
 Write-Host "Both folders are empty until you run:  .\deploy.ps1"
