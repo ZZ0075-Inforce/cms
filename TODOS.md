@@ -186,6 +186,45 @@
 
 ---
 
+## 品質待辦（QA — Course PDF）
+
+來源：2026-07-17 對 `http://localhost:4200/courses/:id/print` 的 `/qa`（Standard tier，以帳號
+`test` 登入）。完整報告與截圖在 `.gstack/qa-reports/qa-report-course-pdf-2026-07-17.md`（未進版控）。
+
+這次順帶還掉了這個功能出貨時掛的兩筆債：列印 CSS **已在 Chromium 實際印出來看過**，
+欄位白名單**已用 8 門真實課程驗證**，無任何內部欄位外洩。詳見報告的「Verified working」表。
+
+**兩項都不在 `fix/cso-swagger-exposure-and-audit-gaps` 上。** `course-print` 由 `7c99a9a` 撰寫、
+`8cf17fa` 併入 develop。要動請**從 develop 開分支**，別讓版面改動混進資安 PR。
+
+### P3 — 客戶文件的最後一頁只有一個 QR code（約 70% 的課程）
+
+- **證據**：`.sheet-footer`（QR 卡 + 提示）實測高 **314.6px**（QR 圖 180×180、卡片 275px），
+  約佔 A4 可用高度的 31%。圖片無法跨頁切割，上一頁剩餘空間小於它時整塊被推到新頁。
+  樣式在 `src/CMS.NG/src/app/features/courses/course-print/course-print.scss:90-101`。
+- **實測 8 門課的末頁字元數**（去空白後；QR 卡本身約佔 37 字元）：
+  62=37、66=33、586=40、633=41、674=74 → 末頁僅剩 QR；618=98 為邊緣；
+  348=412、349=275 → 正常。**5–6/8（約 70%）**。
+- **後果**：寄給客戶或印出來的課程資訊，最後一頁是 95% 空白的紙。浪費，且讀起來像沒做完。
+- **動手前要知道**：**這不是單純的 CSS 修復，是版面決策。** 把 QR 從 180px 縮到 100px 只省約
+  80px，但缺口是 314px 對上約 230px 的剩餘空間 —— 改完仍會依課程內容長度時好時壞。
+  真正要決定的是「客戶文件的結尾該長怎樣」（QR 縮小？移到內容頁右下？接受獨立一頁？），
+  這需要業務／設計的意見，不該由工程單方面決定。
+
+### P4 — `course-print.ts` 的註解宣稱白名單是唯一出口，與實際不符
+
+- **證據**：`src/CMS.NG/src/app/features/courses/course-print/course-print.ts:22` 寫著
+  「What ships out is decided by the two lists below, and nowhere else」。
+  但 `course-print.html:44-64` 另外直接從樣板渲染兩段，未經 `summaryRows()` / `contentRows()`：
+  `相關認證` ← `data.certificationLabels`、`適合職務` ← `data.jobCategoryLabels`。
+  兩者都確實出現在產出的 PDF 上。
+- **後果**：**今天沒有外洩。** 這兩者是 n-n 對照表的標籤，新增 `Course` 欄位仍然到不了它們，
+  而且樣板是逐項列舉而非展開，安全性質本身成立。問題在於這句註解是下一個人稽核
+  「什麼會到客戶手上」時讀的地圖 —— 它指向兩份清單，實際上有四個來源。
+- **修法**：把註解改成列出全部四個來源。純註解修改，零行為風險。
+
+---
+
 ## 已完成（2026-07-17）
 
 - ~~Swagger 在區網匿名公開整個 API 表面~~ — 已修 (`0deeaf0`)，Production/Development 兩邊實測驗證
