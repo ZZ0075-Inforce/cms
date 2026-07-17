@@ -19,8 +19,22 @@
 
   <article class="sheet">
     <header class="sheet-header">
-      <span class="company">{{ companyName }}</span>
-      <span class="doc-kind">課程資訊</span>
+      <div class="brand">
+        <span class="company">{{ companyName }}</span>
+        <span class="doc-kind">課程資訊</span>
+      </div>
+
+      <!-- The QR belongs to the letterhead, not a page footer. It is an image, so it cannot be
+           split across a page break; sitting at the foot of the sheet it pushed itself onto a page
+           of its own whenever the last page had less room than the block was tall (~70% of
+           courses, measured). Here it is always on page 1 and never enters pagination at all. -->
+      <figure class="header-qr">
+        <app-qr-code
+          [value]="qrUrl(data.course)"
+          [title]="null"
+          [fileName]="'QR_' + data.course.courseId" />
+        <figcaption>掃描查看線上課程頁</figcaption>
+      </figure>
     </header>
 
     <h1 class="course-title">{{ data.course.title }}</h1>
@@ -63,12 +77,5 @@
       </section>
     }
 
-    <footer class="sheet-footer">
-      <app-qr-code
-        [value]="qrUrl(data.course)"
-        [title]="data.course.courseId"
-        [fileName]="'QR_' + data.course.courseId" />
-      <p class="scan-hint">掃描 QR Code 查看線上課程頁</p>
-    </footer>
   </article>
 }
