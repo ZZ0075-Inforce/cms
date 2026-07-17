@@ -38,6 +38,24 @@ body {
   margin-top: 0.25rem;
 }
 
+/* Cascade-delete warning inside a PrimeNG ConfirmDialog message.
+
+   Global, and a class rather than an inline style, for two separate reasons — both
+   of which have to hold or the warning silently renders as plain body text:
+
+     1. The dialog injects the message through `[innerHTML]`, outside the calling
+        component's view encapsulation, so a component-scoped selector never matches.
+     2. Angular's `[innerHTML]` binding runs the value through DomSanitizer, and
+        `style` is NOT in its allowed-attribute list — an inline style attribute is
+        stripped outright. `class` IS allowed, so it survives.
+
+   The dialog is the only guard a cascade delete gets, so this must actually be seen. */
+.confirm-warning {
+  margin-top: 0.6rem;
+  color: #dc2626;
+  font-weight: 600;
+}
+
 /* ---------------------------------------------------------------------------
    Print / 另存 PDF.
 

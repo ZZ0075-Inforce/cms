@@ -52,8 +52,10 @@ export class CourseGroupDetail implements OnInit {
     if (!group) return;
 
     // Same cascade warning as the list: deleting the group also deletes its courses.
+    // `.confirm-warning` is global (styles.scss) — see course-group-list.ts for why it cannot be a
+    // scoped class and must not be an inline style.
     const warning = group.courseCount > 0
-      ? `<div style="margin-top:.6rem;color:#dc2626;font-weight:600">此群組下的 ${group.courseCount} 門課程將一併被刪除，且無法復原。</div>`
+      ? `<div class="confirm-warning">此群組下的 ${group.courseCount} 門課程將一併被刪除，且無法復原。</div>`
       : '';
 
     this.confirmationService.confirm({

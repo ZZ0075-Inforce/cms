@@ -118,10 +118,12 @@ export class CourseGroupList implements OnInit {
     // Deleting the group cascade-deletes its courses (FK_Course_CourseGroup ON DELETE CASCADE).
     // That is irreversible and the DB will not stop it, so the count is spelled out here — this
     // dialog is the only guard the courses get.
-    // Inline style, not a scoped class: the dialog renders this via innerHTML outside the
-    // component's style encapsulation, so a component-scoped selector would not reach it.
+    // `.confirm-warning` is a GLOBAL class (styles.scss), and it has to be both: the dialog renders
+    // this via innerHTML outside the component's encapsulation so a scoped selector cannot reach it,
+    // and Angular's innerHTML sanitizer strips `style` attributes but keeps `class` — an inline
+    // style here renders as unstyled body text.
     const warning = group.courseCount > 0
-      ? `<div style="margin-top:.6rem;color:#dc2626;font-weight:600">此群組下的 ${group.courseCount} 門課程將一併被刪除，且無法復原。</div>`
+      ? `<div class="confirm-warning">此群組下的 ${group.courseCount} 門課程將一併被刪除，且無法復原。</div>`
       : '';
 
     this.confirmationService.confirm({
