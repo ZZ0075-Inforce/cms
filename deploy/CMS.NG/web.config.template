@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  web.config for the Angular site (IIS site "CMS", physical path C:\VHome\CMS\NG).
+
+  deploy.ps1 stamps {{API_ORIGIN}} and writes the result into dist\CMS.NG\browser\web.config
+  before copying. Same idea as nginx.conf.template in the azure-deploy kit: the API's address
+  is CONFIGURATION, not something baked into the Angular bundle.
+
+  Requires on the IIS server: URL Rewrite module + Application Request Routing (ARR),
+  with the server-level proxy ENABLED. setup-iis.ps1 does all three.
+-->
+<configuration>
+  <system.webServer>
+    <rewrite>
+      <rules>
+        <!-- 1. Reverse-proxy /api/* to the CMS.API site.
+             The browser only ever talks to this origin, so environment.ts can keep
+             apiBaseUrl: '/api' and no CORS policy is needed in the API. -->
+        <rule name="CMS API proxy" stopProcessing="true">
+          <match url="^api/(.*)" />
+          <action type="Rewrite" url="{{API_ORIGIN}}/api/{R:1}" logRewrittenUrl="true" />
+        </rule>
+
+        <!-- 2. Angular deep links: anything that is not a real file or directory falls
+             back to index.html. The ^/api exclusion is belt-and-braces — rule 1 already
+             stops processing — but without it a misordered edit would silently swallow
+             every API call and return the SPA shell instead of JSON. -->
+        <rule name="Angular routes" stopProcessing="true">
+          <match url=".*" />
+          <conditions logicalGrouping="MatchAll">
+            <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+            <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
+            <add input="{REQUEST_URI}" pattern="^/api" negate="true" />
+          </conditions>
+          <action type="Rewrite" url="/index.html" />
+        </rule>
+      </rules>
+    </rewrite>
+
+    <!-- Angular emits content-hashed filenames (outputHashing: all), so the bundles are
+         safe to cache forever. -->
+    <staticContent>
+      <clientCache cacheControlMode="UseMaxAge" cacheControlMaxAge="365.00:00:00" />
+    </staticContent>
+  </system.webServer>
+
+  <!-- ...but index.html is NOT hashed. Cache it and a redeploy keeps serving the old
+       bundle names until the browser gives up. This is the #1 "I deployed but nothing
+       changed" bug on IIS. -->
+  <location path="index.html">
+    <system.webServer>
+      <staticContent>
+        <clientCache cacheControlMode="DisableCache" />
+      </staticContent>
+    </system.webServer>
+  </location>
+</configuration>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  web.config for the API site (IIS site "CMS.API", physical path C:\VHome\CMS\API).
+
+  `dotnet publish` generates a web.config of its own; deploy.ps1 OVERWRITES it with this one
+  after stamping {{ASPNETCORE_ENVIRONMENT}} and {{CONNECTION_STRING}}. That is the only way to
+  inject the <environmentVariables> block without editing the CMS source tree.
+
+  Requires on the IIS server: the ASP.NET Core 9 Hosting Bundle (AspNetCoreModuleV2).
+-->
+<configuration>
+  <location path="." inheritInChildApplications="false">
+    <system.webServer>
+      <handlers>
+        <add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" />
+      </handlers>
+
+      <aspNetCore processPath="dotnet"
+                  arguments=".\CMS.API.dll"
+                  stdoutLogEnabled="true"
+                  stdoutLogFile=".\logs\stdout"
+                  hostingModel="inprocess">
+        <environmentVariables>
+          <!-- Development, not Production, on purpose:
+                 - Program.cs runs UseHsts() + UseHttpsRedirection() ONLY when IsProduction(),
+                   so a Production API on an HTTP-only binding 307-redirects every call to
+                   https:// and the SPA dies.
+                 - Swagger is registered ONLY when IsDevelopment(), and we want it as a smoke test.
+               A real staging box would use "Staging" (neither of the above) plus an HTTPS binding. -->
+          <environmentVariable name="ASPNETCORE_ENVIRONMENT" value="{{ASPNETCORE_ENVIRONMENT}}" />
+
+          <!-- The key is CMS, not DefaultConnection — SqlConnectionFactory does
+               configuration.GetConnectionString("CMS"). Double underscore = the ':' separator. -->
+          <environmentVariable name="ConnectionStrings__CMS" value="{{CONNECTION_STRING}}" />
+        </environmentVariables>
+      </aspNetCore>
+    </system.webServer>
+  </location>
+</configuration>
