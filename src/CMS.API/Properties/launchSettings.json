@@ -13,6 +13,7 @@
     },
     "http-docker": {
       "commandName": "Project",
+      "//": "The password below is a checked-in fixture, not a secret: what it opens is a container holding test data restored from CMS.bak. Decided 2026-07-17; full rationale in .env.example -- read it before reusing the pattern, because the reason is NOT 'it's only local' (the container listens on 0.0.0.0, verified). Do NOT rewrite this into a // comment -- the SDK rejects JSON comments by silently dropping the whole profile, which would point this at the native SQLEXPRESS instead of the container, with nothing in the error text to say so.",
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "launchUrl": "swagger",

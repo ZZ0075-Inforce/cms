@@ -7,6 +7,12 @@ Where `CMS.bak` goes. `docker-compose.yml` mounts this directory read-only at `/
 copy C:\workspace\bk\CMS.bak database\backup\
 ```
 
+**Keep the contents test data.** The checked-in SA password is treated as a fixture rather than a
+secret *only* because what it opens is a container restored from this backup, and this backup is
+test data — the container is reachable from the LAN, not just loopback. Restoring a backup of real
+data here voids that decision (`spec/docker-db.md` → "The SA password here is a fixture, not a
+secret"; full reasoning in `.env.example`).
+
 ## Why the backup, and not the SQL scripts
 
 `database/*.sql` **cannot build the database**. They are reference DDL exported from SSMS — zero

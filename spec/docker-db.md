@@ -77,6 +77,26 @@ never wipes data.
   included. Git cannot re-include a file whose parent directory is excluded, so `!database/backup/`
   puts the directory back before `database/backup/*.bak` excludes just the backups.
 
+- **The SA password here is a fixture, not a secret** — and it is literal on purpose.
+  `LocalDev#Cms2026` guards a container whose contents are test data restored from `CMS.bak`, so
+  there is nothing behind it worth guarding; this was decided 2026-07-17 rather than left to
+  drift, and `.env.example` carries the full reasoning. **Note what the reason is NOT:** the
+  compose file publishes the port with no bind address, so the container listens on `0.0.0.0` and
+  **is** reachable from the LAN and any tailnet this machine joins (verified 2026-07-17). The test
+  data is the only thing that makes that acceptable — put real data in here and the decision is
+  void. The literal is copied to `.env.example` (its definition — compose reads the variable from
+  there), the manual connection string above in this file, and the `http-docker` profile in
+  `src/CMS.API/Properties/launchSettings.json`; `git grep LocalDev#Cms2026` before changing it
+  rather than trusting this list or a count, and change every hit. The `launchSettings.json` copy
+  is the one that has no choice: it cannot expand `${...}`, and it cannot be annotated in place
+  either —
+  **the SDK rejects JSON comments in `launchSettings.json` by silently discarding the entire
+  profile** (A/B verified on SDK 9.0.314 and 10.0.300 — the run still starts, so `-lp http-docker`
+  would quietly fall back to the native SQLEXPRESS with no hint in the error text). A `"//"`
+  *property* is fine — valid JSON, the SDK ignores it, and schemastore sets no
+  `additionalProperties: false`. Anything that guards something real belongs in `.env`, which is
+  gitignored.
+
 ## Scope
 
 SQL only. **The API and the frontend still run natively** — deliberately, so the existing workflow
