@@ -484,3 +484,13 @@ $RECYCLE.BIN/
 *.swp
 .gstack/
 .claude/worktrees/
+
+# Database backups — ~30 MB and retaken often, so they stay out of git.
+# See database/backup/README.md.
+#
+# Backup*/ on line 264 (dotnet template, meant for SSMS backup folders) is case-insensitive on
+# Windows and swallows this whole directory, README included. Git cannot re-include a file whose
+# parent directory is excluded, so the directory has to be put back before excluding just the
+# backups themselves.
+!database/backup/
+database/backup/*.bak

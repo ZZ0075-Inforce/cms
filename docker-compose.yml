@@ -1,0 +1,58 @@
+# Local dev SQL Server — opt-in; the native .\SQLEXPRESS workflow is untouched.
+#
+#   copy C:\workspace\bk\CMS.bak database\backup\    # data source (database/backup/README.md)
+#   copy .env.example .env                           # sets the SA password
+#   docker compose up -d                             # starts SQL, restores CMS on first run
+#   dotnet run --project src/CMS.API -lp http-docker # points the API at the container
+#
+# appsettings.json still targets .\SQLEXPRESS; nothing here changes that. See spec/docker-db.md.
+
+services:
+  sql:
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    container_name: cms-sql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?copy .env.example to .env and set the password}
+      # Express matches the source machine's edition, so we can't lean on features it lacks.
+      MSSQL_PID: Express
+      #
+      # Do NOT add MSSQL_COLLATION: Chinese_Taiwan_Stroke_CI_AS — it hangs the container forever.
+      # Startup stalls at "index restored for master.syspriorities", sa logins fail with State 115,
+      # and the container never becomes healthy.
+      #
+      # It is also pointless: collation travels inside the backup, so CMS restores as
+      # Chinese_Taiwan_Stroke_CI_AS even though the instance is SQL_Latin1_General_CP1_CI_AS
+      # (verified — all 327 tests pass). Only tempdb follows the instance. See spec/docker-db.md.
+    ports:
+      # The native SQLEXPRESS listens on a dynamic port, so 1433 is free on this machine.
+      - "${SQL_PORT:-1433}:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+      - ./database/backup:/backup:ro
+    healthcheck:
+      # -C is mandatory: tools18 forces encryption and the container's certificate is self-signed.
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 15s      # sqlcmd's cold start exceeds 5s and would be misread as unhealthy
+      retries: 12
+      start_period: 30s
+
+  # One-shot: restore CMS once sql is healthy, then exit. Skips when CMS already exists,
+  # so repeating `docker compose up` never wipes data.
+  sql-init:
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    container_name: cms-sql-init
+    depends_on:
+      sql:
+        condition: service_healthy
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?}
+    volumes:
+      - ./database/backup:/backup:ro
+      - ./database/docker:/scripts:ro
+    entrypoint: ["/bin/bash", "/scripts/init-restore.sh"]
+    restart: "no"
+
+volumes:
+  mssql-data:

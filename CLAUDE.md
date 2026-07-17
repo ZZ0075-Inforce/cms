@@ -39,6 +39,7 @@ dotnet build CMS.sln
 dotnet test                                   # full suite (needs SQLEXPRESS)
 dotnet test --filter "Category!=Integration"  # DB-free; passes with SQL Server stopped
 dotnet run --project src/CMS.API              # http://localhost:5000/swagger (Development only)
+dotnet run --project src/CMS.API -lp http-docker  # same, but against the Docker DB — spec/docker-db.md
 
 cd src/CMS.NG
 npm start                                     # http://localhost:4200
@@ -56,6 +57,7 @@ npx ng build                                  # proves the prod environment.ts r
 | Following the Row Audit / exception-handling conventions | `spec/cross-cutting.md` — the authority |
 | Writing or running tests | `spec/testing.md` |
 | Scaffolding, installing deps, or upgrading | `spec/toolchain.md` |
+| Running the DB in Docker instead of native SQLEXPRESS (opt-in) | `spec/docker-db.md` |
 | Deploying to IIS | `DEPLOY-IIS.md` |
 | Building a **custom** (non-CRUD) feature | `spec/custom/{Feature}/{Feature}.spec.md` + its `ui-*.spec.png` |
 | Picking up known security debt | `TODOS.md` |

@@ -1,0 +1,4 @@
+# This repo has core.autocrlf=true, so checkout rewrites LF to CRLF. Files that execute inside a
+# Linux container must stay LF — a CRLF shell script fails with "bad interpreter: No such file or
+# directory", which gives no hint of the real cause.
+*.sh text eol=lf
