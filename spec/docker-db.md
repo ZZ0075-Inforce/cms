@@ -84,10 +84,12 @@ never wipes data.
   compose file publishes the port with no bind address, so the container listens on `0.0.0.0` and
   **is** reachable from the LAN and any tailnet this machine joins (verified 2026-07-17). The test
   data is the only thing that makes that acceptable — put real data in here and the decision is
-  void. The literal is copied to `.env.example` and the `http-docker` profile in
+  void. The literal is copied to `.env.example` (its definition — compose reads the variable from
+  there), the manual connection string above in this file, and the `http-docker` profile in
   `src/CMS.API/Properties/launchSettings.json`; `git grep LocalDev#Cms2026` before changing it
-  rather than trusting a count, and change every hit. They are literal because
-  `launchSettings.json` cannot expand `${...}`, and they cannot be annotated in place either:
+  rather than trusting this list or a count, and change every hit. The `launchSettings.json` copy
+  is the one that has no choice: it cannot expand `${...}`, and it cannot be annotated in place
+  either —
   **the SDK rejects JSON comments in `launchSettings.json` by silently discarding the entire
   profile** (A/B verified on SDK 9.0.314 and 10.0.300 — the run still starts, so `-lp http-docker`
   would quietly fall back to the native SQLEXPRESS with no hint in the error text). A `"//"`

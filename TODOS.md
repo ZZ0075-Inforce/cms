@@ -169,16 +169,19 @@
   （`.github/workflows` 不存在）。所以光加設定檔不會擋任何東西——沒有執行器，它只是裝飾。
   要真的生效得同時決定由誰跑：GitHub Actions、本機 pre-commit hook，或人工。
 - **背景（2026-07-17 已修正，原文說法有誤）**：稽核當時寫的是「全歷史秘密考古**零命中**」，
-  **那句話是錯的**。`git log --all -S 'LocalDev#Cms2026'` 打到三個 commit，其中
+  **那句話是錯的**。`git log --all -S 'LocalDev#Cms2026'` 有命中，其中
   **`8f4e81c` 與 `b91ba44` 是 `origin/develop` 的祖先，也就是真的公開了**；
-  第三個 `8f8fda4` 是本機孤兒（`b91ba44` 的重複），不在遠端上，別拿它當已公開的證據。
+  `8f8fda4` 是本機孤兒（`b91ba44` 的重複），不在遠端上，別拿它當已公開的證據。
+  這條查詢現在也會打到本分支記錄這個決定的 docs commit——那些是文件不是新的洩漏。
+  **看祖先關係，不要數總數**（連這裡都別寫死份數，理由同下）。
   真正成立的部分只有：**簽章金鑰**從未進版控（`database/*.sql` 只有 DDL，連一個 INSERT 都沒有），
   也沒有任何需要輪換的**正式**憑證。
 - **那個命中已結案，不是待辦**：它是 Docker 本機 DB 的 SA 密碼，已於 2026-07-17
   明確決定為 **fixture 而非秘密**並就地寫明理由（見「已完成」與 `.env.example`）。
   P4 留著是為了「**保持**乾淨」，不是為了清理既有髒東西。若日後補設定檔，記得把測試常數
   （`AdminAuthTestFactory.cs:29`、`JwtAuthTestFactory.cs:21` 等的 `*-signing-key-*`）
-  和那三個 fixture 路徑一起加進 allowlist，否則每次都誤報。
+  和 fixture 路徑（`.env.example`、`spec/docker-db.md`、`launchSettings.json`）
+  一起加進 allowlist，否則每次都誤報。
 
 ### P4 — .NET SDK 停在 9.0.314（修補版 9.0.316）
 
@@ -254,8 +257,8 @@
     要把連接埠綁 `127.0.0.1`，並停止把這個值當 fixture。
   - **改成了什麼**：字面值原地保留，但都不再是無主的。`.env.example` 寫下完整理由，
     `spec/docker-db.md` 與 `launchSettings.json` 的 `"//"` 屬性指回去。
-    要改的時候**先 `git grep LocalDev#Cms2026`**，別相信文件裡寫死的份數——
-    `launchSettings.json` 不支援 `${...}` 展開，所以它們只能是字面值。
+    要改的時候**先 `git grep LocalDev#Cms2026`**，別相信文件裡寫死的份數。
+    其中 `launchSettings.json` 不支援 `${...}` 展開，只能寫字面值。
   - **實測擋下的坑**：`launchSettings.json` **不能**用 JSON 註解標注。SDK 會拒絕註解並
     **靜默丟棄整個 profile**，程式照跑，於是 `-lp http-docker` 會無聲連回原生 SQLEXPRESS
     而非容器，錯誤訊息完全不提資料庫。合法 JSON 的 `"//"` 屬性則可行（已實測 profile 仍正常套用，
