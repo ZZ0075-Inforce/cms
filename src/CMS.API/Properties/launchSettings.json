@@ -13,6 +13,7 @@
     },
     "http-docker": {
       "commandName": "Project",
+      "//": "The password below is a checked-in fixture, not a secret: it only opens a throwaway localhost container. Decided 2026-07-17; the rationale and the other two copies live in .env.example. Do NOT rewrite this into a // comment -- the SDK rejects JSON comments by silently dropping the whole profile, which would point this at the native SQLEXPRESS instead of the container, with nothing in the error text to say so.",
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "launchUrl": "swagger",

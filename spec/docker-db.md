@@ -77,6 +77,18 @@ never wipes data.
   included. Git cannot re-include a file whose parent directory is excluded, so `!database/backup/`
   puts the directory back before `database/backup/*.bak` excludes just the backups.
 
+- **The SA password here is a fixture, not a secret** — and it is literal in three places on
+  purpose. `LocalDev#Cms2026` only ever opens a throwaway container on `localhost:1433`, so it
+  grants nothing to anyone who cannot already reach this machine's loopback; this was decided
+  2026-07-17 rather than left to drift, and `.env.example` carries the full reasoning. The three
+  copies are `.env.example`, this file, and the `http-docker` profile in
+  `src/CMS.API/Properties/launchSettings.json` — **change one, change all three.** They are
+  literal because `launchSettings.json` cannot expand `${...}`, and they cannot be annotated in
+  place either: **the SDK rejects JSON comments in `launchSettings.json` by silently discarding
+  the entire profile**, so `-lp http-docker` would quietly fall back to the native SQLEXPRESS with
+  no hint in the error text. (A `"//"` *property* is fine — valid JSON, and the SDK ignores it.)
+  Anything that guards something real belongs in `.env`, which is gitignored.
+
 ## Scope
 
 SQL only. **The API and the frontend still run natively** — deliberately, so the existing workflow

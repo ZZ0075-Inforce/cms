@@ -165,13 +165,18 @@
 
 ### P4 — 沒有秘密掃描防護檔
 
-- **現況**：`.gitleaks.toml` 與 `.secretlintrc` 都不存在。
-- **背景**：2026-07-17 的全歷史秘密考古是**零命中**——沒有任何需要輪換的憑證，
-  簽章金鑰從未進版控（`database/*.sql` 只有 DDL，連一個 INSERT 都沒有）。
-  目前是乾淨的，防護檔是為了讓它**保持**乾淨。
-- **要做的話**：加 `.gitleaks.toml`，並把測試常數
-  （`AdminAuthTestFactory.cs:29`、`JwtAuthTestFactory.cs:21` 等的 `*-signing-key-*`）加進 allowlist，
-  否則它們每次都會誤報。
+- **現況**：`.gitleaks.toml` 與 `.secretlintrc` 都不存在，且**本 repo 完全沒有 CI**
+  （`.github/workflows` 不存在）。所以光加設定檔不會擋任何東西——沒有執行器，它只是裝飾。
+  要真的生效得同時決定由誰跑：GitHub Actions、本機 pre-commit hook，或人工。
+- **背景（2026-07-17 已修正，原文說法有誤）**：稽核當時寫的是「全歷史秘密考古**零命中**」，
+  **那句話是錯的**。`git log --all -S 'LocalDev#Cms2026'` 打到 `8f4e81c`、`8f8fda4`、`b91ba44`。
+  真正成立的部分只有：**簽章金鑰**從未進版控（`database/*.sql` 只有 DDL，連一個 INSERT 都沒有），
+  也沒有任何需要輪換的**正式**憑證。
+- **那個命中已結案，不是待辦**：它是 Docker 本機 DB 的 SA 密碼，已於 2026-07-17
+  明確決定為 **fixture 而非秘密**並就地寫明理由（見「已完成」與 `.env.example`）。
+  P4 留著是為了「**保持**乾淨」，不是為了清理既有髒東西。若日後補設定檔，記得把測試常數
+  （`AdminAuthTestFactory.cs:29`、`JwtAuthTestFactory.cs:21` 等的 `*-signing-key-*`）
+  和那三個 fixture 路徑一起加進 allowlist，否則每次都誤報。
 
 ### P4 — .NET SDK 停在 9.0.314（修補版 9.0.316）
 
@@ -199,9 +204,6 @@
 - **約 1280px 以下頁面會水平捲動**：1013px 時 `scrollWidth` 1173 vs `clientWidth` 998，
   看板的 Description 欄跑到畫面外。**內容沒被切掉**，捲動就看得到，1280px 以上完全無溢出。
   對內部管理後台可接受，記著以備日後真的要支援更窄的螢幕。
-- **`launchSettings.json` 有明文開發密碼**（`Password=LocalDev#Cms2026`）且該檔進版控。
-  本機拋棄式容器算常見做法，但這個 repo 剛做完資安稽核，值得有意識地決定而不是放它飄著。
-  這是隨 Docker 工作進來的，非 QA 產生。
 
 ### 這次沒測到的（別把分數讀得比實際大）
 
@@ -235,6 +237,23 @@
 - ~~上稿看板的 PromoCode 查詢一次點擊送出兩個請求~~ — 已修 (`bcaa547`)。
   (blur) 與 (onClick) 雙重綁定；加上 in-flight 防護，並用 pending Subject 寫回歸測試
   （已驗證拿掉修復後該測試會失敗）。
+
+**決定（非缺陷，結案不修）**
+
+- ~~版控裡的明文開發密碼該怎麼辦~~ — **已決定：它是 fixture，不是秘密**，保留字面值並就地寫明理由。
+  - **為什麼不改**：`LocalDev#Cms2026` 只開得了 `localhost:1433` 上一個隨時能從 `CMS.bak`
+    重建的拋棄式容器，對碰不到本機 loopback 的人毫無用處。而且**這個 repo 是公開的，
+    值已經在歷史裡**（`8f4e81c`、`8f8fda4`、`b91ba44`）—— 把 HEAD 洗乾淨並不會撤回任何東西，
+    只有 force-push 改寫歷史才會，那對一個拋棄式容器密碼不划算。改成佔位符會讓每個開發者
+    多一道手續，換到零安全性。
+  - **改成了什麼**：三份字面值原地保留，但都不再是無主的。`.env.example` 寫下完整理由，
+    `spec/docker-db.md` 與 `launchSettings.json` 的 `"//"` 屬性指回去。
+    **三份必須同動**——`launchSettings.json` 不支援 `${...}` 展開，所以它們只能是字面值。
+  - **實測擋下的坑**：`launchSettings.json` **不能**用 JSON 註解標注。SDK 會拒絕註解並
+    **靜默丟棄整個 profile**，程式照跑，於是 `-lp http-docker` 會無聲連回原生 SQLEXPRESS
+    而非容器，錯誤訊息完全不提資料庫。合法 JSON 的 `"//"` 屬性則可行（已實測 profile 仍正常套用，
+    且 schemastore 未設 `additionalProperties: false`，IDE 不會警告）。
+  - **沒做的**：`.gitleaks.toml`。本 repo 沒有 CI，設定檔沒有執行器就擋不住東西 —— 見 P4。
 
 > **這份清單不能取代專業資安稽核。** 來源是 AI 輔助掃描，會捕捉常見漏洞模式，但不完整、
 > 不保證，也不能取代合格資安廠商。對於處理敏感資料、付款或個資的正式系統，
