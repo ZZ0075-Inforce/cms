@@ -14,7 +14,7 @@ How the CMS app is deployed to an on-prem IIS server. Copied into the project by
 | Angular app pool | `CMS.NG.Pool` (No Managed Code) |
 | API app pool | `CMS.API.Pool` (No Managed Code) |
 | Angular URL | http://localhost/ |
-| API URL (Swagger) | http://localhost:5001/swagger |
+| API URL | `http://127.0.0.1:5001` — **loopback only**, reached via the SPA's `/api` ARR proxy. No Swagger in Production (see below). |
 | Database | `CMS` on `.\SQLEXPRESS` — **must already exist** (Windows auth, as the API app pool identity) |
 
 ## Topology — why two sites and a proxy
@@ -22,7 +22,7 @@ How the CMS app is deployed to an on-prem IIS server. Copied into the project by
 ```
 Browser ──▶ IIS site "CMS" :80    (C:\VHome\CMS\NG — the Angular build)
                 │
-                ├─ /api/*  ──[URL Rewrite + ARR proxy]──▶ http://localhost:5001/api/*
+                ├─ /api/*  ──[URL Rewrite + ARR proxy]──▶ http://127.0.0.1:5001/api/*
                 │                                              │
                 │                                    IIS site "CMS.API" :5001
                 │                                    (AspNetCoreModuleV2, in-process)
@@ -145,26 +145,40 @@ templates at deploy time:
 |---|---|---|
 | `CMS.API\web.config.template` | `{{ASPNETCORE_ENVIRONMENT}}` | `$aspnetEnv` |
 | | `{{CONNECTION_STRING}}` | `$connString` |
-| `CMS.NG\web.config.template` | `{{API_ORIGIN}}` | `http://localhost:$apiPort` |
+| `CMS.NG\web.config.template` | `{{API_ORIGIN}}` | `http://127.0.0.1:$apiPort` (v4 literal — the API site binds v4-only, and `localhost` resolves to `::1` first) |
 
 So the connection string is never in the repo, and repointing the SPA at a different API is a
 config edit, not a rebuild.
 
-> **`ASPNETCORE_ENVIRONMENT` is `Development`, on purpose.** `Program.cs` calls `UseHsts()` +
-> `UseHttpsRedirection()` **only** when `IsProduction()` — on an HTTP-only IIS binding a
-> Production API would 307-redirect every call to `https://` and the SPA would break. Development
-> also keeps Swagger available as a smoke test. A real staging box should use **`Staging`**
-> (neither the HTTPS redirect nor Swagger/dev-CORS) **plus an HTTPS binding**.
+> **`ASPNETCORE_ENVIRONMENT` is `Production`, and that is what hides Swagger.** `Program.cs`
+> registers Swagger only under `IsDevelopment()`, so this one value decides whether the entire API
+> surface — every route, verb, parameter and DTO, including the Admin-only ones — is readable
+> without a token. Set it to `Development` on a deployed box and Swagger goes public again.
+>
+> It has no other effect: `Program.cs` contains no `UseHsts()` and no `UseHttpsRedirection()`, so
+> `Production` cannot 307-redirect the SPA. An earlier version of this note claimed it could, and
+> used that to justify pinning the environment to `Development`; the code it described never
+> existed. (Verified 2026-07-17.)
+>
+> **The API site binds to `127.0.0.1` only** (`setup-iis.ps1`), because the browser reaches it
+> solely through the SPA's `/api` ARR proxy. That is the other half of the same guard: the
+> environment flag hides Swagger, the loopback binding makes the port unreachable off-box. Keep
+> both — either one alone fails the moment someone changes the other.
+>
+> **Still to do: there is no HTTPS binding.** Passwords and JWTs cross the LAN in cleartext. If you
+> add TLS, add the binding *and* `UseHsts()`/`UseHttpsRedirection()` together — do not reintroduce
+> an environment pin as a stand-in for either.
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
 | `/api/*` returns **404**, SPA loads fine | The ARR server proxy is off. `Set-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter system.webServer/proxy -Name enabled -Value True` — this is what `setup-iis.ps1` step 3 does. |
-| `/api/*` returns **502.3** | The `CMS.API` site is down. Check http://localhost:5001/swagger directly, and `C:\VHome\CMS\API\logs\stdout*.log`. |
+| `/api/*` returns **502.3** | The `CMS.API` site is down. Check `C:\VHome\CMS\API\logs\stdout*.log`. To probe the API directly you must be **on the box** (it binds `127.0.0.1` only): `curl -i http://127.0.0.1:5001/api/lookups/app-roles` — a **401** means it's healthy. Use the v4 literal, not `localhost`, which resolves to `::1` first and will refuse. There is no Swagger in Production. |
 | API returns **500.19** | Config error — usually URL Rewrite not installed, or the pool identity can't read `C:\VHome\CMS\API`. |
 | API returns **500.30 / 502.5** | ASP.NET Core Hosting Bundle missing, or `arguments=".\CMS.API.dll"` doesn't match the published DLL name. |
-| Every API call **307-redirects to https** | `ASPNETCORE_ENVIRONMENT` is `Production` on an HTTP-only site. Set it to `Development` or `Staging`. |
+| Every API call **307-redirects to https** | Can't happen — `Program.cs` has no `UseHttpsRedirection()`. If you see this, someone added one; add the HTTPS binding rather than reverting the environment. |
+| `/swagger` returns **404** on the deployed box | Working as intended. Swagger is `IsDevelopment()`-only and `deploy.ps1` stamps `Production`. Use `dotnet run` locally for Swagger. |
 | Login returns **500** | The database has no `SysConfig.appConfig` row — the JWT signing key is read from it at runtime. |
 | API **500** on any data call, incl. login | The app pool identity has no SQL access. The site runs as `IIS APPPOOL\CMS.API.Pool`, not as you. Look in `C:\VHome\CMS\API\logs\stdout*.log` for `Cannot open database "CMS" ... Login failed for user 'IIS APPPOOL\CMS.API.Pool'` (error 4060) — re-run `setup-iis.ps1` (step 8 grants it; it was opt-in via `-GrantSqlAccess` before 2026-07-17, which is how a box ends up in this state). Re-running is also how a box granted `db_owner` by the old script gets downgraded — check the `SQL login` line in the banner for the roles it read back. |
 | **F5 on a deep link → 404** | The SPA fallback rewrite is missing. Confirm `web.config` reached `C:\VHome\CMS\NG\` and URL Rewrite is installed. |

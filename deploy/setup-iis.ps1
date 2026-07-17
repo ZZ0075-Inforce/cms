@@ -227,13 +227,35 @@ $serverSetup = {
     }
 
     # ---- 6. Sites ------------------------------------------------------------
+    # IPAddress is per-site and deliberate. Nothing off-box has any reason to reach the API directly:
+    # the browser only ever talks to the NG site, which ARR-proxies /api to http://127.0.0.1:<apiPort>
+    # (deploy.ps1 stamps API_ORIGIN). So the API binds to LOOPBACK — that costs nothing functionally
+    # and is what keeps the whole API surface off the network. The SPA is the site people actually
+    # visit, so it answers on every interface.
+    #
+    # The API's '127.0.0.1' is a v4 literal and the proxy target must match it literally: this binding
+    # does NOT listen on ::1, and Windows resolves "localhost" to ::1 first. Change one, change both.
     $sites = @(
-        @{ Name = $cfg.ApiSite; Port = $cfg.ApiPort; Path = $cfg.SitePathApi; Pool = $cfg.ApiPool },
-        @{ Name = $cfg.NgSite;  Port = $cfg.NgPort;  Path = $cfg.SitePathNg;  Pool = $cfg.NgPool }
+        @{ Name = $cfg.ApiSite; Port = $cfg.ApiPort; Path = $cfg.SitePathApi; Pool = $cfg.ApiPool; Ip = '127.0.0.1' },
+        @{ Name = $cfg.NgSite;  Port = $cfg.NgPort;  Path = $cfg.SitePathNg;  Pool = $cfg.NgPool;  Ip = '*' }
     )
     foreach ($s in $sites) {
+        $wanted = "$($s.Ip):$($s.Port):"
+
         if (Get-Website -Name $s.Name -ErrorAction SilentlyContinue) {
-            Good "site $($s.Name) already exists (:$($s.Port))"
+            # Converge, don't skip. A box set up before the API moved to loopback still holds the old
+            # *:5001 binding, and that is precisely the one that must not survive — same reasoning as
+            # the db_owner DROP below: creating is idempotent, but only an explicit rewrite fixes a
+            # box that already exists.
+            $binding = Get-WebBinding -Name $s.Name -Protocol http | Select-Object -First 1
+            if ($binding -and $binding.bindingInformation -ne $wanted) {
+                $was = $binding.bindingInformation
+                Set-WebBinding -Name $s.Name -BindingInformation $was `
+                    -PropertyName BindingInformation -Value $wanted
+                Good "site $($s.Name) binding converged $was -> $wanted (restart the site to apply)"
+            } else {
+                Good "site $($s.Name) already exists ($wanted)"
+            }
             continue
         }
 
@@ -257,8 +279,9 @@ $serverSetup = {
             }
         }
 
-        New-Website -Name $s.Name -Port $s.Port -PhysicalPath $s.Path -ApplicationPool $s.Pool | Out-Null
-        Good "site $($s.Name) created (:$($s.Port) -> $($s.Path))"
+        New-Website -Name $s.Name -Port $s.Port -IPAddress $s.Ip `
+            -PhysicalPath $s.Path -ApplicationPool $s.Pool | Out-Null
+        Good "site $($s.Name) created ($wanted -> $($s.Path))"
     }
 
     # ---- 7. Filesystem rights for the pool identities ------------------------
@@ -399,7 +422,12 @@ $ngUrl    = if ($ngPort -eq 80) { "http://$hostName/" } else { "http://${hostNam
 Write-Host ""
 Write-Host "==================== DONE ====================" -ForegroundColor Green
 Write-Host "  Angular site : $ngUrl  -> $sitePathNg"
-Write-Host "  API site     : http://${hostName}:$apiPort/swagger  -> $sitePathApi"
+Write-Host "  API site     : http://127.0.0.1:$apiPort/  -> $sitePathApi"
+Write-Host "                 (loopback only, by design — reached via the SPA's /api ARR proxy."
+Write-Host "                  No Swagger: deploy.ps1 stamps ASPNETCORE_ENVIRONMENT=Production."
+Write-Host "                  Smoke test: ${ngUrl}api/lookups/app-roles should return 401, which"
+Write-Host "                  proves the proxy, the app and auth are all live. A 502 means the API"
+Write-Host "                  site is down; the SPA's index.html means the rewrite rules are wrong.)"
 Write-Host "  App pools    : $ngPool, $apiPool"
 if ($SkipSqlAccess) {
     Write-Host "  SQL login    : SKIPPED by -SkipSqlAccess. deploy.ps1 uses Trusted_Connection=True," -ForegroundColor Yellow

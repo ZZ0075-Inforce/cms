@@ -64,7 +64,7 @@ $apiPort     = 5001                               # IIS site "CMS.API"
 $ngPort      = 80                                 # IIS site "CMS"  <- open this in the browser
 
 # Stamped into the API's web.config at deploy time (never committed to the CMS repo).
-$aspnetEnv   = "Development"                      # see CMS.API\web.config.template for why
+$aspnetEnv   = "Production"                       # gates Swagger off; see CMS.API\web.config.template
 $connString  = 'Server=.\SQLEXPRESS;Database=CMS;Trusted_Connection=True;TrustServerCertificate=True;Encrypt=True'
 # ===========================================================================
 
@@ -270,9 +270,12 @@ if (-not $ApiOnly) {
     }
 
     # 2. Stamp web.config into the dist (ARR proxy target + SPA fallback)
-    Write-Step "Stamping Angular web.config (/api -> http://localhost:$apiPort)..."
+    Write-Step "Stamping Angular web.config (/api -> http://127.0.0.1:$apiPort)..."
     Write-WebConfig -Template $ngTemplate -Destination "$ngDist\web.config" -Tokens @{
-        API_ORIGIN = "http://localhost:$apiPort"
+        # 127.0.0.1, NOT localhost. setup-iis.ps1 binds the API site to 127.0.0.1 (IPv4 only), and
+        # on Windows "localhost" resolves to ::1 first — ARR would try the v6 address, get refused
+        # and 502 every /api call. Spelling the v4 address removes the resolution step entirely.
+        API_ORIGIN = "http://127.0.0.1:$apiPort"
     }
     Write-OK "web.config written (reverse proxy + deep-link fallback)"
 

@@ -123,11 +123,30 @@ var app = builder.Build();
 // It never clears the response, so CORS headers an inner middleware added are preserved.
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
-app.UseSwagger();
-app.UseSwaggerUI();
-// The root redirect is a mapped endpoint, so the RequireAuthenticatedUser fallback policy would 401 it
-// — opt it out explicitly.
-app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription().AllowAnonymous();
+// Swagger is DEVELOPMENT-ONLY, and the guard is load-bearing rather than cosmetic.
+//
+// UseSwagger/UseSwaggerUI are terminal middleware: they write the response and return without calling
+// _next. Registered here — above UseRouting (below) and UseAuthorization — a /swagger request never
+// reaches AuthorizationMiddleware, which is the only thing that evaluates the FallbackPolicy set in
+// AddAuthorization. The policy is simply inert for these paths. That is NOT the "no endpoint means no
+// fallback" myth: the fallback DOES cover non-endpoint requests, which is why the "/" redirect below
+// has to opt out explicitly. Swagger escapes for the other reason — it short-circuits first.
+//
+// So without this guard the whole API surface (every route, verb, parameter and DTO, including the
+// Admin-only ones) is readable by anyone who can reach the port, with no token. Moving the middleware
+// below UseAuthorization would not fix it either; only not registering it in production does.
+//
+// Defence in depth: setup-iis.ps1 also binds the API site to 127.0.0.1, so it is unreachable off-box
+// even if this guard is lost. Both are needed — neither alone survives the other being changed.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+
+    // The root redirect is a mapped endpoint, so the RequireAuthenticatedUser fallback policy would
+    // 401 it — opt it out explicitly. It only exists to reach Swagger, so it lives under this guard.
+    app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription().AllowAnonymous();
+}
 
 // No UseHttpsRedirection: the API serves plain HTTP on :5000. The template's redirect would
 // 307 every call to https://localhost:5001 (nothing listening there) and break CORS preflight.

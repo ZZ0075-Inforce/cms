@@ -21,12 +21,20 @@
                   stdoutLogFile=".\logs\stdout"
                   hostingModel="inprocess">
         <environmentVariables>
-          <!-- Development, not Production, on purpose:
-                 - Program.cs runs UseHsts() + UseHttpsRedirection() ONLY when IsProduction(),
-                   so a Production API on an HTTP-only binding 307-redirects every call to
-                   https:// and the SPA dies.
-                 - Swagger is registered ONLY when IsDevelopment(), and we want it as a smoke test.
-               A real staging box would use "Staging" (neither of the above) plus an HTTPS binding. -->
+          <!-- Production. deploy.ps1 stamps this from $aspnetEnv.
+
+               This value is load-bearing for exactly ONE thing: Program.cs registers Swagger only
+               under IsDevelopment(), so Production is what keeps the API surface off the network.
+               Set this to Development on a deployed box and Swagger goes public again — the guard in
+               Program.cs reads THIS variable and nothing else.
+
+               Program.cs has no other environment-conditional logic: no UseHsts, no
+               UseHttpsRedirection. Flipping this value cannot 307-redirect the SPA to https, because
+               there is no redirect to fire. (An earlier comment here claimed otherwise; it described
+               code that never existed, and pinned this to Development to dodge a hazard that was not
+               real. Verified 2026-07-17: IsProduction/UseHsts/UseHttpsRedirection appear nowhere in
+               src/.) If HTTPS is ever added, add the binding AND the redirect together — do not
+               reintroduce an environment pin as a substitute. -->
           <environmentVariable name="ASPNETCORE_ENVIRONMENT" value="{{ASPNETCORE_ENVIRONMENT}}" />
 
           <!-- The key is CMS, not DefaultConnection — SqlConnectionFactory does
