@@ -36,7 +36,11 @@ describe('AppUserDetail', () => {
 
   // The signed-in caller's roles drive the Admin-only 重設密碼 button; default to Admin so the
   // existing behaviour tests still see it. Pass [] for a non-Admin caller.
-  async function setup(failWith?: number, signedInRoles: string[] = ['Admin']): Promise<void> {
+  async function setup(
+    failWith?: number,
+    signedInRoles: string[] = ['Admin'],
+    userOverride?: Partial<AppUser>
+  ): Promise<void> {
     userService = jasmine.createSpyObj<AppUserService>('AppUserService',
       ['getById', 'remove', 'resetPassword']);
     lookupService = jasmine.createSpyObj<LookupService>('LookupService', ['appRoles']);
@@ -46,7 +50,7 @@ describe('AppUserDetail', () => {
     userService.getById.and.returnValue(
       failWith
         ? throwError(() => new HttpErrorResponse({ status: failWith }))
-        : of(user)
+        : of({ ...user, ...userOverride })
     );
     userService.remove.and.returnValue(of(void 0));
     userService.resetPassword.and.returnValue(of(void 0));
@@ -90,6 +94,22 @@ describe('AppUserDetail', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('miles@uuu.com.tw');
     expect(text).toContain('Miles Sun');
+  });
+
+  it('renders 密碼更新時間 as the server wall-clock, not shifted by the local UTC offset', async () => {
+    // The API sends DateTime.Now with no zone; the pipe must parse it as local, so the rendered
+    // time equals the sent time verbatim in any test-runner timezone.
+    await setup(undefined, ['Admin'], { passwordUpdatedTime: '2026-07-16T16:18:25.897' });
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('2026-07-16 16:18');
+  });
+
+  it('renders 尚未設定 when the password has never been set', async () => {
+    await setup();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('尚未設定');
   });
 
   it('renders assigned roles as "RoleName (RoleId)" chips, not raw ids', async () => {

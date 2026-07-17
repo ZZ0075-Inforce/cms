@@ -23,7 +23,8 @@ export interface AppUser {
   userId: string;
   userName: string;
   isActive: boolean;
-  /** Set on create / reset-password only. datetime with no zone — append 'Z' before parsing. */
+  /** Set on create / reset-password / change-password only. Server local wall-clock (DateTime.Now),
+   *  zoneless — render as-is; treating it as UTC shifts it by the server offset. */
   passwordUpdatedTime: string | null;
   /** 角色數 — count of AppUserRole rows. */
   roleCount: number;
