@@ -186,68 +186,13 @@
 
 ---
 
-## 品質待辦（QA — Course PDF）
+## 品質待辦（QA）
 
-來源：2026-07-17 對 `http://localhost:4200/courses/:id/print` 的 `/qa`（Standard tier，以帳號
-`test` 登入）。完整報告與截圖在 `.gstack/qa-reports/qa-report-course-pdf-2026-07-17.md`（未進版控）。
+來源：2026-07-17 的兩輪 `/qa`（Standard tier，帳號 `test`）—— 一輪針對 Course PDF，
+一輪掃全專案 7 個功能與認證流程。完整報告在 `.gstack/qa-reports/`（未進版控）。
 
-這次順帶還掉了這個功能出貨時掛的兩筆債：列印 CSS **已在 Chromium 實際印出來看過**，
-欄位白名單**已用 8 門真實課程驗證**，無任何內部欄位外洩。詳見報告的「Verified working」表。
-
-**兩項都不在 `fix/cso-swagger-exposure-and-audit-gaps` 上。** `course-print` 由 `7c99a9a` 撰寫、
-`8cf17fa` 併入 develop。要動請**從 develop 開分支**，別讓版面改動混進資安 PR。
-
-### P3 — 客戶文件的最後一頁只有一個 QR code（約 70% 的課程）
-
-- **證據**：`.sheet-footer`（QR 卡 + 提示）實測高 **314.6px**（QR 圖 180×180、卡片 275px），
-  約佔 A4 可用高度的 31%。圖片無法跨頁切割，上一頁剩餘空間小於它時整塊被推到新頁。
-  樣式在 `src/CMS.NG/src/app/features/courses/course-print/course-print.scss:90-101`。
-- **實測 8 門課的末頁字元數**（去空白後；QR 卡本身約佔 37 字元）：
-  62=37、66=33、586=40、633=41、674=74 → 末頁僅剩 QR；618=98 為邊緣；
-  348=412、349=275 → 正常。**5–6/8（約 70%）**。
-- **後果**：寄給客戶或印出來的課程資訊，最後一頁是 95% 空白的紙。浪費，且讀起來像沒做完。
-- **動手前要知道**：**這不是單純的 CSS 修復，是版面決策。** 把 QR 從 180px 縮到 100px 只省約
-  80px，但缺口是 314px 對上約 230px 的剩餘空間 —— 改完仍會依課程內容長度時好時壞。
-  真正要決定的是「客戶文件的結尾該長怎樣」（QR 縮小？移到內容頁右下？接受獨立一頁？），
-  這需要業務／設計的意見，不該由工程單方面決定。
-
-### P4 — `course-print.ts` 的註解宣稱白名單是唯一出口，與實際不符
-
-- **證據**：`src/CMS.NG/src/app/features/courses/course-print/course-print.ts:22` 寫著
-  「What ships out is decided by the two lists below, and nowhere else」。
-  但 `course-print.html:44-64` 另外直接從樣板渲染兩段，未經 `summaryRows()` / `contentRows()`：
-  `相關認證` ← `data.certificationLabels`、`適合職務` ← `data.jobCategoryLabels`。
-  兩者都確實出現在產出的 PDF 上。
-- **後果**：**今天沒有外洩。** 這兩者是 n-n 對照表的標籤，新增 `Course` 欄位仍然到不了它們，
-  而且樣板是逐項列舉而非展開，安全性質本身成立。問題在於這句註解是下一個人稽核
-  「什麼會到客戶手上」時讀的地圖 —— 它指向兩份清單，實際上有四個來源。
-- **修法**：把註解改成列出全部四個來源。純註解修改，零行為風險。
-
----
-
-## 品質待辦（QA — 全專案掃描）
-
-來源：2026-07-17 的全專案 `/qa`（Standard tier，以帳號 `test` 登入），涵蓋 7 個功能與認證流程。
-完整報告在 `.gstack/qa-reports/qa-report-full-app-2026-07-17.md`（未進版控）。
-
-**結果：全部只有 1 項缺陷（Low）。** 所有頁面零 console 錯誤，驗證閘門處處守住，
-認證邊界完好。**順帶把 `ec8902b` 的修復第一次用真瀏覽器驗過** —— 該 commit 只有
-「290/290 單元測試 + ng build」背書，但那個 bug 的本質是「紅字沒變紅」，測試看不到顏色。
-實測課程群組 260（底下 4 門課）的刪除對話框，警告確實是 `rgb(220,38,38)` / `font-weight:600`，
-`.confirm-warning` 全域 class 有活過 sanitizer。**修復有效。**
-
-### P4 — 上稿看板的 PromoCode 查詢，一次點擊送出兩個請求
-
-- **證據**：`src/CMS.NG/src/app/features/featured-promo-items/featured-promo-item-form/featured-promo-item-form.html:11`
-  的 input 綁了 `(blur)="lookup()"`，:18 的查詢鈕綁了 `(onClick)="lookup()"`。
-  使用者點查詢鈕時焦點離開輸入框 → blur 先呼叫一次 `lookup()`，click 再呼叫一次。
-- **實測拆解**（每個綁定各貢獻一個請求，是驗證不是推論）：
-  真實點擊（焦點在輸入框）= 2；JS `.click()`（不移動焦點，不觸發 blur）= 1；
-  單獨 `blur()` = 1；`blur()` 後再 click = 2。
-- **後果**：小。這是等冪的 GET 且兩次帶同樣的代碼，不可能競態成錯誤結果。
-  代價是每次查詢多一趟往返，代碼查不到時 console 多一行 404。
-- **修法**：拿掉 `(blur)` 綁定，或在 `lookup()` 內對同一代碼的進行中請求加防護
-  —— `lookingUp()` signal 已經存在，一行就夠。
+**三項缺陷已於 `fix/qa-findings-course-print-and-promo-lookup` 全數修復**（見「已完成」）。
+以下留存的是**沒有修、但你該知道**的東西。
 
 ### 觀察（未列為缺陷）
 
@@ -271,9 +216,25 @@
 
 ## 已完成（2026-07-17）
 
+**資安（`/cso` 稽核）**
+
 - ~~Swagger 在區網匿名公開整個 API 表面~~ — 已修 (`0deeaf0`)，Production/Development 兩邊實測驗證
 - ~~管理員重設密碼未留稽核紀錄~~ — 已修 (`e47ab5b`)
-- ~~串聯刪除警告被 sanitizer 剝除而靜默失效~~ — 已修 (`ec8902b`)
+- ~~串聯刪除警告被 sanitizer 剝除而靜默失效~~ — 已修 (`ec8902b`)。
+  **2026-07-17 已用真瀏覽器驗證**：課程群組 260（底下 4 門課）的刪除對話框，警告確實是
+  `rgb(220,38,38)` / `font-weight:600`。原 commit 只有「290/290 + ng build」背書，
+  而那個 bug 的本質是紅字沒變紅 —— 測試看不到顏色。
+
+**品質（`/qa`）**
+
+- ~~客戶 PDF 的最後一頁只有一個 QR code（8 門課有 5-6 門）~~ — 已修 (`8cd96c7`)。
+  QR 移到抬頭右上並絕對定位（脫離流才是關鍵：放在流裡會推移斷點，實測反而讓 618 多一頁）。
+  同樣 8 門課實測 **27 頁 → 23 頁，零門變差**。
+- ~~`course-print.ts` 的註解宣稱白名單是唯一出口，與實際不符~~ — 已修 (`fd3f06e`)。
+  相關認證／適合職務 走樣板繞過白名單，實際有四個來源；註解已改成畫出全部四個。
+- ~~上稿看板的 PromoCode 查詢一次點擊送出兩個請求~~ — 已修 (`bcaa547`)。
+  (blur) 與 (onClick) 雙重綁定；加上 in-flight 防護，並用 pending Subject 寫回歸測試
+  （已驗證拿掉修復後該測試會失敗）。
 
 > **這份清單不能取代專業資安稽核。** 來源是 AI 輔助掃描，會捕捉常見漏洞模式，但不完整、
 > 不保證，也不能取代合格資安廠商。對於處理敏感資料、付款或個資的正式系統，

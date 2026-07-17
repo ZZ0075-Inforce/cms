@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { RowAuditService } from '@core/services/row-audit.service';
 import { HttpErrorResponse } from '@angular/common/http';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 
 import { FeaturedPromoItemForm, FeaturedPromoItemFormContext, FeaturedPromoItemFormInitial } from './featured-promo-item-form';
 import { LookupService } from '@core/services/lookup.service';
@@ -121,6 +121,36 @@ describe('FeaturedPromoItemForm', () => {
 
       expect(probe().lookupError()).toBe('找不到促銷代碼');
       expect(probe().promoCodeResolved()).toBeFalse();
+    });
+
+    // Regression: QA 2026-07-17 — the field's (blur) and the 查詢 button's (onClick) both call
+    // lookup(), and clicking the button blurs the field, so one press fired two identical
+    // requests. A pending Subject is what reproduces it: with of()/throwError() the first call
+    // answers before the second starts, which is exactly the race the browser does not have.
+    it('does not fire a second lookup while one is still in flight', () => {
+      const pending = new Subject<PromotionLookup>();
+      lookups.promotionByCode.and.returnValue(pending.asObservable());
+      probe().form.controls.promoCode.setValue('20251204_SkillTrainAI');
+
+      probe().lookup();   // (blur)
+      probe().lookup();   // (onClick), before the first answers
+
+      expect(lookups.promotionByCode).toHaveBeenCalledTimes(1);
+
+      pending.next(promotion);
+      pending.complete();
+      expect(probe().promoCodeResolved()).toBeTrue();
+    });
+
+    it('still allows a fresh lookup once an in-flight one has failed', () => {
+      lookups.promotionByCode.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+      probe().form.controls.promoCode.setValue('nope');
+
+      probe().lookup();
+      probe().lookup();
+
+      // The error path clears lookingUp, so the guard must not strand the user on a dead code.
+      expect(lookups.promotionByCode).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -19,11 +19,23 @@ interface PrintRow {
  *
  * This is deliberately NOT 檢視課程 (course-detail) with fields hidden. The internal columns
  * simply do not exist here, so a field added to the admin page later cannot leak onto a document
- * that goes to a customer. What ships out is decided by the two lists below, and nowhere else:
+ * that goes to a customer. Every field of the Course record that ships out is decided by the two
+ * lists below, and nowhere else:
  *
  *   Course record ──► summaryRows() + contentRows()  ──► the sheet
  *                     (an allow-list; everything                │
  *                      not named here never renders)            └─► window.print() → 另存 PDF
+ *
+ * If you are auditing what reaches a customer, those two lists are not the whole sheet. The
+ * template renders four sources, and the other two do not pass through here at all:
+ *
+ *   • summaryRows() / contentRows() — this file's allow-list over the Course record
+ *   • 相關認證  ← view.certificationLabels ─┐ n-n lookup labels, rendered straight from
+ *   • 適合職務  ← view.jobCategoryLabels   ─┘ course-print.html; see the @if blocks there
+ *
+ * The allow-list property still holds — a new Course *column* cannot reach the label arrays, and
+ * the template names each one explicitly rather than spreading the view. But a new label array on
+ * CourseView would only be one `@if` away from the sheet, and it would never touch this file.
  *
  * Deliberately excluded as internal: pkid, displayOrder, friendlyUrl, prodCourseId,
  * publishStatusName, scheduleOn/scheduleOff, note, the Row Audit badge, the action toolbar.
